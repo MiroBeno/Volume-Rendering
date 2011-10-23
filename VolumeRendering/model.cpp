@@ -58,7 +58,7 @@ float4 sample_color(float3 point) {
 	#if 1
 		return transfer_function(sample_data(point));
 	#else
-		point = mul(add(point, mk_float3(1,1,1)), 0.5f);		// propocitanie polohy bodu <-1;1>(x,y,z) na float vyjadrenie farby <0;1>(r,g,b,1)
+		point = mul(add(point, mk_float3(1,1,1)), 0.5f);		// prepocitanie polohy bodu <-1;1>(x,y,z) na float vyjadrenie farby <0;1>(r,g,b,1)
 		return mk_float4(point.x, point.y, point.z, 0.5f);			
 	//	return mk_float4((sample * point.x)/ 255.0f, (sample * point.y) / 255.0f, (sample * point.z) / 255.0f, sample / 255.0f);
 	#endif

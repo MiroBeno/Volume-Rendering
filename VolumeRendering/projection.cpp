@@ -4,7 +4,6 @@
 
 const float max_cam_distance = 10, min_cam_distance = 0.1f;
 const float d_distance = 0.1f, d_vert_angle = DEG_TO_RAD(5.0f), d_horiz_angle = DEG_TO_RAD(10.0f);
-const float3 y_down_vector = {0, -1, 0};
 
 static float cam_distance = 2, cam_vert_angle = 0, cam_horiz_angle = 0;
 static float3 cam_position = {2, 0, 0};
@@ -22,16 +21,16 @@ float3 compute_camera_position() {
 }
 
 float3 camera_up() {
-	cam_vert_angle = MAXIMUM(cam_vert_angle - d_vert_angle, DEG_TO_RAD(-89));
-	//while (cam_vert_angle < 0) 
-	//	cam_vert_angle += 2 * PI;
+	cam_vert_angle = cam_vert_angle - d_vert_angle;
+	while (cam_vert_angle < -PI) 
+		cam_vert_angle += 2 * PI;
 	return compute_camera_position();
 }
 
 float3 camera_down() {
-	cam_vert_angle = MINIMUM(cam_vert_angle + d_vert_angle,DEG_TO_RAD(89));
-	//while (cam_vert_angle >= 2 * PI) 
-	//	cam_vert_angle -= 2 * PI;
+	cam_vert_angle = cam_vert_angle + d_vert_angle;
+	while (cam_vert_angle >= PI) 
+		cam_vert_angle -= 2 * PI;
 	return compute_camera_position();
 }
 
@@ -70,7 +69,7 @@ float3 get_camera_position() {
 	return cam_position;
 }
 
-void inic_view(int width_px, int height_px, float size) {
+void init_view(int width_px, int height_px, float size) {
 	view_width_half_px = width_px / 2;
 	view_height_half_px = height_px / 2;
 	view_px_step = size / MINIMUM(width_px, height_px);			
@@ -80,7 +79,10 @@ void inic_view(int width_px, int height_px, float size) {
 	if ((view_vector.x == 0) && (view_vector.z == 0))					// specialny pripad pri vektore rovnobeznom s osou y (nemozme pouzit vektor y na vypocet kolmeho vektora)
 		view_vector.x = 0.000001f;
 	
-	view_right_plane = cross_product(y_down_vector, view_vector);		// pravidlo pravej ruky v pravotocivej sustave, vektorove nasobenie vrati pravy uhol na dva vektory
+	float3 y_vector = {0, 1, 0}; 
+	if ((cam_vert_angle >= -PI/2) && (cam_vert_angle <= PI/2)) 
+		y_vector = mul(y_vector, -1);
+	view_right_plane = cross_product(y_vector, view_vector);		// pravidlo pravej ruky v pravotocivej sustave, vektorove nasobenie vrati pravy uhol na dva vektory
 	view_up_plane = cross_product(view_right_plane, view_vector);
 
 	//printf("view vector:%4.2f %4.2f %4.2f\nup vector:%4.2f %4.2f %4.2f\nright vector:%4.2f %4.2f %4.2f\n\n", view_vector.x, view_vector.y, view_vector.z, view_up_plane.x, view_up_plane.y, view_up_plane.z, view_right_plane.x, view_right_plane.y, view_right_plane.z);

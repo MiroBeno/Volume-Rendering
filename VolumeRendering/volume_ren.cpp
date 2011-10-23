@@ -31,13 +31,13 @@ void gl_finalize_PBO() {
 void draw_volume() {
 	GLubyte *pbo_array = gl_prepare_PBO();
 
-	inic_view(WIN_WIDTH, WIN_HEIGHT, 3.5f);	
+	init_view(WIN_WIDTH, WIN_HEIGHT, 3.5f);	
 	float3 origin = {0,0,0}, direction = {0,0,0};
 	for(int row = 0; row < WIN_HEIGHT; row++)
 		for(int col = 0; col < WIN_WIDTH; col++)
 		{	
 			get_view_ray(row, col, &origin, &direction);
-			float4 color = render_ray(origin, direction);
+			float4 color = render_ray_alt(origin, direction);
 			*pbo_array++ = (unsigned char) map_interval(color.r,256);
 			*pbo_array++ = (unsigned char) map_interval(color.g,256);
 			*pbo_array++ = (unsigned char) map_interval(color.b,256);
@@ -95,7 +95,7 @@ void keyboard_callback(unsigned char key, int x, int y) {
 			case '1': set_camera_position_deg(2,45,45); break;
 			case '2': set_camera_position_deg(2,135,225); break;
 			case '3': set_camera_position_deg(2,225,225); break;
-			case '4': set_camera_position_deg(2,0,0); break;
+			case '4': set_camera_position_deg(-2,0,0); break;
 		}
 		draw_volume();
 	}

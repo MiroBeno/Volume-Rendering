@@ -12,7 +12,7 @@ float3 camera_zoom_out();
 float3 set_camera_position_deg(float distance, float vert_angle, float horiz_angle);
 float3 get_camera_position();
 
-void inic_view(int width_px, int height_px, float size);
+void init_view(int width_px, int height_px, float size);
 void get_view_ray(int row, int col, float3 *origin, float3 *direction);
 
 #endif
