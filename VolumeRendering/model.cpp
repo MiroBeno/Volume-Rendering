@@ -2,12 +2,12 @@
 #include <stdlib.h>
 #include "model.h"
 
-static int volume_size_x, volume_size_y, volume_size_z;	
-static size_t volume_size_bytes = 0;
-static unsigned char *volume = NULL;
-static float3 min_bound, max_bound;
-static float step = 0.06f;											// upravit podla poctu voxelov 
-static const float4 bg_color = mk_float4(0,0,0,1);					// opacity backgroundu je 1
+/*static*/ int volume_size_x, volume_size_y, volume_size_z;	
+/*static*/ size_t volume_size_bytes = 0;
+/*static*/ unsigned char *volume = NULL;
+/*static*/ float3 min_bound, max_bound;
+/*static*/ float step = 0.06f;											// upravit podla poctu voxelov 
+/*static*/ const float4 bg_color = mk_float4(0,0,0,1);					// opacity backgroundu je 1
 
 int load_file(const char *file_name, unsigned char **result, size_t *file_size) {
 	*file_size = 0;
@@ -108,7 +108,7 @@ float4 render_ray(float3 origin, float3 direction) {
 	color_acc = add(color_acc, mul(bg_color, 1-color_acc.a));			// opacity backgroundu je 1
 	color_acc.a = 1.0f;
 	return color_acc;
-};
+}
 
 //////////////////
 //OLD CODE
@@ -171,4 +171,4 @@ float4 render_ray_alt(float3 origin, float3 direction) {
 	color_acc.b += bg_color.b * (1-color_acc.a);
 	color_acc.a += bg_color.a * (1-color_acc.a);
 	return color_acc;
-};
+}

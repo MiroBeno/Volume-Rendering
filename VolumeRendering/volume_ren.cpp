@@ -17,6 +17,10 @@ const char *FILE_NAME = "Bucky.raw";						// 32x32x32  x unsigned char
 static int window_id;
 static GLuint pbo_id;
 
+extern unsigned char *run_kernel(void);
+extern void free_cuda(void);
+extern void init_cuda(void);
+
 GLubyte *gl_prepare_PBO() {
 	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_id);
 	glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, DATA_SIZE, NULL, GL_DYNAMIC_DRAW_ARB);
@@ -28,7 +32,23 @@ void gl_finalize_PBO() {
 	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 }
 
+void draw_volume_cuda() {
+	GLubyte *pbo_array = gl_prepare_PBO();
+
+	init_view(WIN_WIDTH, WIN_HEIGHT, 3.5f);	
+	unsigned char *col_buffer;
+	col_buffer = run_kernel();
+	for(int i = 0; i < DATA_SIZE; i++)
+			*pbo_array++ = col_buffer[i];
+	gl_finalize_PBO();
+	glutPostRedisplay();
+}
+
 void draw_volume() {
+
+	draw_volume_cuda();
+	return;
+
 	GLubyte *pbo_array = gl_prepare_PBO();
 
 	init_view(WIN_WIDTH, WIN_HEIGHT, 3.5f);	
@@ -102,6 +122,7 @@ void keyboard_callback(unsigned char key, int x, int y) {
 	if (key=='z') {
 		glutDestroyWindow(window_id);
 		glDeleteBuffersARB(1, &pbo_id);
+		free_cuda();
 		exit(0);
 	}
 
@@ -138,6 +159,7 @@ int main(int argc, char **argv) {
 
 	glGenBuffersARB(1, &pbo_id);					// pouzivat ARB extensions metody, alebo nativne?
 
+	init_cuda();
 	draw_volume();
 	glutMainLoop();
 	return 0;
