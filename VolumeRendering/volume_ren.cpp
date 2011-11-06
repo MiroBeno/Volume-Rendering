@@ -46,8 +46,8 @@ void draw_volume_cuda() {
 
 void draw_volume() {
 
-	draw_volume_cuda();
-	return;
+	//draw_volume_cuda();
+	//return;
 
 	GLubyte *pbo_array = gl_prepare_PBO();
 
@@ -58,9 +58,9 @@ void draw_volume() {
 		{	
 			get_view_ray(row, col, &origin, &direction);
 			float4 color = render_ray_alt(origin, direction);
-			*pbo_array++ = (unsigned char) map_interval(color.r,256);
-			*pbo_array++ = (unsigned char) map_interval(color.g,256);
-			*pbo_array++ = (unsigned char) map_interval(color.b,256);
+			*pbo_array++ = (unsigned char) map_interval(color.x,256);
+			*pbo_array++ = (unsigned char) map_interval(color.y,256);
+			*pbo_array++ = (unsigned char) map_interval(color.z,256);
 			*pbo_array++ = 255;
 		}
 
@@ -115,7 +115,7 @@ void keyboard_callback(unsigned char key, int x, int y) {
 			case '1': set_camera_position_deg(2,45,45); break;
 			case '2': set_camera_position_deg(2,135,225); break;
 			case '3': set_camera_position_deg(2,225,225); break;
-			case '4': set_camera_position_deg(-2,0,0); break;
+			case '4': set_camera_position_deg(2,0,0); break;
 		}
 		draw_volume();
 	}

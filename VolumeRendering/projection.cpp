@@ -1,5 +1,4 @@
-/**/#include <stdio.h>
-
+//#include <stdio.h>
 #include "projection.h"
 
 const float max_cam_distance = 10, min_cam_distance = 0.1f;
@@ -73,30 +72,30 @@ void init_view(int width_px, int height_px, float size) {
 	view_width_half_px = width_px / 2;
 	view_height_half_px = height_px / 2;
 	view_px_step = size / MINIMUM(width_px, height_px);			
-	view_vector = mul(cam_position, -1);						// pozicia kamery je uprostred viewu (pozicia kamery), smerujeme vzdy do [0,0,0] staci vynasobit -1 (= 0 - center)
-	view_vector = normalize_vector(view_vector);
+	view_vector = -cam_position;						// pozicia kamery je uprostred viewu (pozicia kamery), smerujeme vzdy do [0,0,0] staci vynasobit -1 (= 0 - center)
+	view_vector = vector_normalize(view_vector);
 
 	if ((view_vector.x == 0) && (view_vector.z == 0))					// specialny pripad pri vektore rovnobeznom s osou y (nemozme pouzit vektor y na vypocet kolmeho vektora)
 		view_vector.x = 0.000001f;
 	
 	float3 y_vector = {0, 1, 0}; 
 	if ((cam_vert_angle >= -PI/2) && (cam_vert_angle <= PI/2)) 
-		y_vector = mul(y_vector, -1);
+		y_vector = -y_vector;
 	view_right_plane = cross_product(y_vector, view_vector);		// pravidlo pravej ruky v pravotocivej sustave, vektorove nasobenie vrati pravy uhol na dva vektory
 	view_up_plane = cross_product(view_right_plane, view_vector);
 
 	//printf("view vector:%4.2f %4.2f %4.2f\nup vector:%4.2f %4.2f %4.2f\nright vector:%4.2f %4.2f %4.2f\n\n", view_vector.x, view_vector.y, view_vector.z, view_up_plane.x, view_up_plane.y, view_up_plane.z, view_right_plane.x, view_right_plane.y, view_right_plane.z);
 
-	view_right_plane = normalize_vector(view_right_plane);		
-	view_up_plane = normalize_vector(view_up_plane);			
-	view_right_plane = mul(view_right_plane, view_px_step);								
-	view_up_plane = mul(view_up_plane, view_px_step);
+	view_right_plane = vector_normalize(view_right_plane);		
+	view_up_plane = vector_normalize(view_up_plane);			
+	view_right_plane = view_right_plane * view_px_step;	
+	view_up_plane = view_up_plane * view_px_step;
 }
 
 void get_view_ray(int row, int col, float3 *origin, float3 *direction) {
 	*direction = view_vector;
-	*origin = add(cam_position, mul(view_right_plane, (float) (col - view_width_half_px)));
-	*origin = add(*origin, mul(view_up_plane, (float) (row - view_height_half_px)));
+	*origin = cam_position + (view_right_plane * (float) (col - view_width_half_px));
+	*origin = *origin + (view_up_plane * (float) (row - view_height_half_px));
 }
 
 

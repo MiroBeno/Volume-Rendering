@@ -1,7 +1,7 @@
 #ifndef _PROJECTION_H_
 #define _PROJECTION_H_
 
-#include "datatypes.h"
+#include "data_types.h"
 
 float3 camera_up();
 float3 camera_down();
