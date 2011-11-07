@@ -19,8 +19,10 @@ unsigned char *dev_col_buffer;
 unsigned char col_buffer[DATA_SIZE];
 
 __device__ float4 sample_color_cuda(float3 point) {
-	point = (point + make_float3(1,1,1)) * 0.5f;	
-	return make_float4(point.x, point.y, point.z, 0.5f);	
+	float4 color = {(point.x+1)* 0.5f,(point.y+1)* 0.5f,(point.z+1)* 0.5f,0.3f};
+	return color;	
+	//point = (point + make_float3(1,1,1)) * 0.5f;	
+	//return make_float4(point.x, point.y, point.z, 0.5f);	
 }
 
 __device__ float2 intersect_1D_cuda(float pt, float dir, float min_bound, float max_bound) {
@@ -48,13 +50,15 @@ __device__ float2 intersect_3D_cuda(float3 pt, float3 dir, float3 min_bound, flo
 }
 
 __global__ void render_ray_cuda(float3 min_bound, float3 max_bound, float step, float3 origin, float3 direction, float3 view_right_plane, float3 view_up_plane, unsigned char dev_col_buffer[]) {
-	origin = origin + (view_right_plane * (float) (threadIdx.x - 256));
-	origin = origin + (view_up_plane * (float) (blockIdx.x - 256));
+	int col = threadIdx.x;
+	int row = blockIdx.x;
+	origin = origin + (view_right_plane * (float) (col - 256));
+	origin = origin + (view_up_plane * (float) (row - 256));
 	float2 k_range = intersect_3D_cuda(origin, direction, min_bound, max_bound);
 	if ((k_range.x > k_range.y) || (k_range.y <0)) {				// prazdny interval koeficientu k = nie je presecnik ALEBO vystupny priesecnik je za bodom vzniku luca
-		dev_col_buffer[(blockIdx.x*blockDim.x + threadIdx.x)*4] = 128;
-		dev_col_buffer[(blockIdx.x*blockDim.x + threadIdx.x)*4+1] = 128;
-		dev_col_buffer[(blockIdx.x*blockDim.x + threadIdx.x)*4+2] = 128;
+		dev_col_buffer[(blockIdx.x*blockDim.x + threadIdx.x)*4] = 0;
+		dev_col_buffer[(blockIdx.x*blockDim.x + threadIdx.x)*4+1] = 0;
+		dev_col_buffer[(blockIdx.x*blockDim.x + threadIdx.x)*4+2] = 0;
 		dev_col_buffer[(blockIdx.x*blockDim.x + threadIdx.x)*4+3] = 255;
 		return;//bg_color;
 	}
@@ -72,9 +76,9 @@ __global__ void render_ray_cuda(float3 min_bound, float3 max_bound, float step, 
 			break;
 	}
 	color_acc = color_acc + (make_float4(0, 0, 0, 1) * (1 - color_acc.w));	
-	dev_col_buffer[(blockIdx.x*blockDim.x + threadIdx.x)*4] = color_acc.x;
-	dev_col_buffer[(blockIdx.x*blockDim.x + threadIdx.x)*4+1] = color_acc.y;
-	dev_col_buffer[(blockIdx.x*blockDim.x + threadIdx.x)*4+2] = color_acc.z;
+	dev_col_buffer[(blockIdx.x*blockDim.x + threadIdx.x)*4] = map_interval(color_acc.x,256);
+	dev_col_buffer[(blockIdx.x*blockDim.x + threadIdx.x)*4+1] = map_interval(color_acc.y,256);
+	dev_col_buffer[(blockIdx.x*blockDim.x + threadIdx.x)*4+2] = map_interval(color_acc.z,256);
 	dev_col_buffer[(blockIdx.x*blockDim.x + threadIdx.x)*4+3] = 255;
 }
 
