@@ -9,8 +9,6 @@
 #include "model.h"
 #include "projection.h"
 
-const int WIN_WIDTH = 512;
-const int WIN_HEIGHT = 512;
 const GLsizeiptr DATA_SIZE = WIN_WIDTH * WIN_HEIGHT * 4;	// int CHANNEL_COUNT = 4;
 const char *FILE_NAME = "Bucky.raw";						// 32x32x32  x unsigned char
 
@@ -58,9 +56,9 @@ void draw_volume() {
 		{	
 			get_view_ray(row, col, &origin, &direction);
 			float4 color = render_ray_alt(origin, direction);
-			*pbo_array++ = (unsigned char) map_interval(color.x,256);
-			*pbo_array++ = (unsigned char) map_interval(color.y,256);
-			*pbo_array++ = (unsigned char) map_interval(color.z,256);
+			*pbo_array++ = (unsigned char) map_float_int(color.x,256);
+			*pbo_array++ = (unsigned char) map_float_int(color.y,256);
+			*pbo_array++ = (unsigned char) map_float_int(color.z,256);
 			*pbo_array++ = 255;
 		}
 

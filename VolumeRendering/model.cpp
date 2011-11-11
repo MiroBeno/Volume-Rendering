@@ -7,7 +7,7 @@
 /*static*/ unsigned char *volume = NULL;
 /*static*/ float3 min_bound, max_bound;
 /*static*/ float step = 0.06f;											// upravit podla poctu voxelov 
-/*static*/ const float4 bg_color = {0,0,0,1};							// opacity backgroundu je 1
+/*static*/ const float4 bg_color = {0.5,0.5,0.5,1};							// opacity backgroundu je 1
 
 int load_file(const char *file_name, unsigned char **result, size_t *file_size) {
 	*file_size = 0;
@@ -44,9 +44,9 @@ int load_model(const char* file_name) {
 
 unsigned char sample_data(float3 pos) {
    return volume[
-		map_interval((pos.z + 1) / 2, volume_size_z) * volume_size_x * volume_size_y +
-		map_interval((pos.y + 1) / 2, volume_size_y) * volume_size_x +
-		map_interval((pos.x + 1) / 2, volume_size_x)
+		map_float_int((pos.z + 1) / 2, volume_size_z) * volume_size_x * volume_size_y +
+		map_float_int((pos.y + 1) / 2, volume_size_y) * volume_size_x +
+		map_float_int((pos.x + 1) / 2, volume_size_x)
 	];
 }
 
@@ -59,7 +59,7 @@ float4 sample_color(float3 point) {
 		return transfer_function(sample_data(point));
 	#else
 		point = (point + make_float3(1,1,1)) * 0.5f;		// prepocitanie polohy bodu <-1;1>(x,y,z) na float vyjadrenie farby <0;1>(r,g,b,1)
-		return make_float4(point.x, point.y, point.z, 0.5f);			
+		return make_float4(point.x, point.y, point.z, 0.05f);			
 	#endif
 }
 
@@ -89,7 +89,7 @@ float2 intersect_3D(float3 pt, float3 dir) {
 
 float4 render_ray(float3 origin, float3 direction) {
 	float2 k_range = intersect_3D(origin, direction);
-	if ((k_range.x > k_range.y) || (k_range.y <0))				// prazdny interval koeficientu k = nie je presecnik ALEBO vystupny priesecnik je za bodom vzniku luca
+	if ((k_range.x > k_range.y) || (k_range.y < 0))				// prazdny interval koeficientu k = nie je presecnik ALEBO vystupny priesecnik je za bodom vzniku luca
 		return bg_color;
 	if ((k_range.x < 0))										// bod vzniku luca je vnutri kocky, zaciname nie vstupnym priesecnikom, ale bodom vzniku
 		k_range.x = 0;

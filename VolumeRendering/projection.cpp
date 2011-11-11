@@ -6,8 +6,8 @@ const float d_distance = 0.1f, d_vert_angle = DEG_TO_RAD(5.0f), d_horiz_angle = 
 
 static float cam_distance = 2, cam_vert_angle = 0, cam_horiz_angle = 0;
 /*static*/ float3 cam_position = {2, 0, 0};
-/*static*/ int view_width_half_px = 256, view_height_half_px = 256;
-static float view_px_step = 3.5f / 512;
+/*static*/ int view_width_half_px = WIN_WIDTH / 2, view_height_half_px = WIN_HEIGHT / 2;
+static float view_px_step = 3.5f / MINIMUM(WIN_WIDTH, WIN_HEIGHT);
 /*static*/ float3 view_vector = {-1, 0, 0}, view_right_plane = {0, 0, 1}, view_up_plane = {0, 1, 0};
 
 float3 compute_camera_position() {
