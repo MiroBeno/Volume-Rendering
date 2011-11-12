@@ -44,8 +44,7 @@ void draw_volume_cuda() {
 
 void draw_volume() {
 
-	draw_volume_cuda();
-	return;
+	draw_volume_cuda();return;
 
 	GLubyte *pbo_array = gl_prepare_PBO();
 

@@ -1,7 +1,7 @@
 #ifndef _MODEL_H_
 #define _MODEL_H_
 
-#include "data_types.h"
+#include "data_utils.h"
 
 int load_model(const char* file_name);
 float4 render_ray(float3 origin, float3 direction);

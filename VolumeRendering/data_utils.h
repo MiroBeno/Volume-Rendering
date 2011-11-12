@@ -1,5 +1,5 @@
-#ifndef _DATA_TYPES_H_
-#define _DATA_TYPES_H_
+#ifndef _DATA_UTILS_H_
+#define _DATA_UTILS_H_
 
 #include <math.h>
 #include <float.h>
@@ -62,7 +62,7 @@ inline __host__ __device__ float4 operator*(float4 a, float b)
 
 // other
 
-inline __host__ __device__ unsigned int map_float_int(float f, unsigned int n) {			// mapuje float<0,1> na int<0,n-1>
+inline __host__ __device__ unsigned int map_float_int(float f, unsigned int n) {		// mapuje float<0,1> na int<0,n-1>
    long i = (long) (f * n);
    if (i >= (int) n) i = n - 1;
    if (i < 0) i = 0;

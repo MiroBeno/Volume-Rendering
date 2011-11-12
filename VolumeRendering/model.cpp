@@ -2,12 +2,12 @@
 #include <stdlib.h>
 #include "model.h"
 
-/*static*/ int volume_size_x, volume_size_y, volume_size_z;	
-/*static*/ size_t volume_size_bytes = 0;
+/*static*/ int3 volume_dims;	
+/*static*/ size_t volume_size = 0;
 /*static*/ unsigned char *volume = NULL;
 /*static*/ float3 min_bound, max_bound;
 /*static*/ float step = 0.06f;											// upravit podla poctu voxelov 
-/*static*/ const float4 bg_color = {0.5,0.5,0.5,1};							// opacity backgroundu je 1
+static const float4 bg_color = {0.5,0.5,0.5,1};							// opacity backgroundu je 1
 
 int load_file(const char *file_name, unsigned char **result, size_t *file_size) {
 	*file_size = 0;
@@ -31,22 +31,22 @@ int load_file(const char *file_name, unsigned char **result, size_t *file_size) 
 }
 
 int load_model(const char* file_name) {
-	int result = load_file(file_name, &volume, &volume_size_bytes);
-	if (volume_size_bytes == 0 || result != 0) 
+	int result = load_file(file_name, &volume, &volume_size);
+	if (volume_size == 0 || result != 0) 
 		return -1;
-	printf("File loaded: %s. Size: %u B.\n", file_name, volume_size_bytes);
-	volume_size_x = volume_size_y = volume_size_z = 32;								// nacita sa z hlavicky, zatial explicitne
-	int max_size = MAXIMUM(volume_size_x, MAXIMUM(volume_size_y, volume_size_z));	// dlzka najvacsej hrany je 2 a stred kvadra v [0,0,0]
-	max_bound = make_float3(volume_size_x / (float) max_size, volume_size_y / (float) max_size, volume_size_z / (float) max_size);
+	printf("File loaded: %s. Size: %u B.\n", file_name, volume_size);
+	volume_dims = make_int3(32, 32, 32);								// nacita sa z hlavicky, zatial explicitne
+	int max_size = MAXIMUM(volume_dims.x, MAXIMUM(volume_dims.y, volume_dims.z));	// dlzka najvacsej hrany je 2 a stred kvadra v [0,0,0]
+	max_bound = make_float3(volume_dims.x / (float) max_size, volume_dims.y / (float) max_size, volume_dims.z / (float) max_size);
 	min_bound = -max_bound;
 	return 0;
 }
 
 unsigned char sample_data(float3 pos) {
    return volume[
-		map_float_int((pos.z + 1) / 2, volume_size_z) * volume_size_x * volume_size_y +
-		map_float_int((pos.y + 1) / 2, volume_size_y) * volume_size_x +
-		map_float_int((pos.x + 1) / 2, volume_size_x)
+		map_float_int((pos.z + 1) / 2, volume_dims.z) * volume_dims.x * volume_dims.y +
+		map_float_int((pos.y + 1) / 2, volume_dims.y) * volume_dims.x +
+		map_float_int((pos.x + 1) / 2, volume_dims.x)
 	];
 }
 
