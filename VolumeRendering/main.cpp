@@ -15,9 +15,12 @@ const char *FILE_NAME = "Bucky.raw";						// 32x32x32  x unsigned char
 static int window_id;
 static GLuint pbo_id;
 
-extern unsigned char *run_kernel(void);
+extern unsigned char *render_volume_cuda(void);
 extern void free_cuda(void);
 extern void init_cuda(void);
+
+extern void init_cpu();
+extern void render_volume_cpu(unsigned char *buffer);
 
 GLubyte *gl_prepare_PBO() {
 	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_id);
@@ -35,8 +38,8 @@ void draw_volume_cuda() {
 
 	init_view(WIN_WIDTH, WIN_HEIGHT, VIRTUAL_VIEW_SIZE);	
 	unsigned char *col_buffer;
-	col_buffer = run_kernel();
-	for(int i = 0; i < DATA_SIZE; i++)
+	col_buffer = render_volume_cuda();
+	for(int i = 0; i < DATA_SIZE; i++)					//TODO zbytocne kopirovanie
 			*pbo_array++ = col_buffer[i];
 	gl_finalize_PBO();
 	glutPostRedisplay();
@@ -48,18 +51,8 @@ void draw_volume() {
 
 	GLubyte *pbo_array = gl_prepare_PBO();
 
-	init_view(WIN_WIDTH, WIN_HEIGHT, VIRTUAL_VIEW_SIZE);	
-	float3 origin = {0,0,0}, direction = {0,0,0};
-	for(int row = 0; row < WIN_HEIGHT; row++)
-		for(int col = 0; col < WIN_WIDTH; col++)
-		{	
-			get_view().get_view_ray(col, row, &origin, &direction);
-			float4 color = render_ray_alt(origin, direction);
-			*pbo_array++ = (unsigned char) map_float_int(color.x,256);
-			*pbo_array++ = (unsigned char) map_float_int(color.y,256);
-			*pbo_array++ = (unsigned char) map_float_int(color.z,256);
-			*pbo_array++ = 255;
-		}
+	init_view(WIN_WIDTH, WIN_HEIGHT, VIRTUAL_VIEW_SIZE);
+	render_volume_cpu((unsigned char *)pbo_array);
 
 	gl_finalize_PBO();
 	glutPostRedisplay();
@@ -157,6 +150,7 @@ int main(int argc, char **argv) {
 	glGenBuffersARB(1, &pbo_id);					// pouzivat ARB extensions metody, alebo nativne?
 
 	init_cuda();
+	init_cpu();
 	draw_volume();
 	glutMainLoop();
 	return 0;

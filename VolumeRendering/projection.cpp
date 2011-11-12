@@ -34,7 +34,7 @@ float3 camera_up() {
 }
 
 float3 camera_down() {
-	cam_angles.y -= d_angles.y;
+	cam_angles.y += d_angles.y;
 	while (cam_angles.y >= PI) 
 		cam_angles.y -= 2 * PI;
 	return compute_camera_position();
