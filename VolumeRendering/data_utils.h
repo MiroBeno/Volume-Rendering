@@ -13,9 +13,6 @@
 #define MINIMUM(a,b) ((a)<(b)?(a):(b))
 #define DEG_TO_RAD(a) ((a) * PI / 180)
 
-#define WIN_WIDTH 512
-#define WIN_HEIGHT 512
-
 const float POS_INF = FLT_MAX, NEG_INF = FLT_MIN;
 
 // float3 ops

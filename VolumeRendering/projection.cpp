@@ -7,11 +7,15 @@ const float d_distance = 0.1f;
 
 static float2 cam_angles = {0,0};			// x - horizontalny uhol, y - vertikalny uhol
 static float cam_distance = 2; 
-/*static*/ float3 cam_position = {2, 0, 0};
+static float3 cam_position = {2, 0, 0};
 
-static int2 view_half_px = {WIN_WIDTH / 2, WIN_HEIGHT / 2};
-static float view_px_step = 3.5f / MINIMUM(WIN_WIDTH, WIN_HEIGHT);
-/*static*/ float3 view_vector = {-1, 0, 0}, view_right_plane = {0, 0, 1}, view_up_plane = {0, 1, 0};
+static Ortho_view view = {	{WIN_WIDTH, WIN_HEIGHT}, 
+							{WIN_WIDTH / 2, WIN_HEIGHT / 2}, 
+							{2, 0, 0},
+							{-1, 0, 0},
+							make_float3(0, 0, -1) * (VIRTUAL_VIEW_SIZE / MINIMUM(WIN_WIDTH, WIN_HEIGHT)),
+							make_float3(0, 1, 0) * (VIRTUAL_VIEW_SIZE / MINIMUM(WIN_WIDTH, WIN_HEIGHT)),
+						 };
 
 float3 compute_camera_position() {
 	float tmp = cam_distance * cos(cam_angles.y);
@@ -67,34 +71,36 @@ float3 set_camera_position_deg(float distance, float vert_angle, float horiz_ang
 	return compute_camera_position();
 }
 
-void init_view(int width_px, int height_px, float size) {
-	view_half_px.x = width_px / 2;
-	view_half_px.y = height_px / 2;
-	view_px_step = size / MINIMUM(width_px, height_px);			
-	view_vector = -cam_position;						// pozicia kamery je uprostred viewu (pozicia kamery), smerujeme vzdy do [0,0,0] staci vynasobit -1 (= 0 - center)
-	view_vector = vector_normalize(view_vector);
+void init_view(int width_px, int height_px, float virtual_size) {
+	view.size_px.x = width_px; 
+	view.size_px.y = height_px;
+	view.half_px.x = width_px / 2; 
+	view.half_px.y = height_px / 2;	
+	view.origin = cam_position;					
+	view.direction = vector_normalize(-view.origin);				// pozicia kamery je uprostred viewu (pozicia kamery), smerujeme vzdy do [0,0,0] staci vynasobit -1 (= 0 - center)
 
-	if ((view_vector.x == 0) && (view_vector.z == 0))					// specialny pripad pri vektore rovnobeznom s osou y (nemozme pouzit vektor y na vypocet kolmeho vektora)
-		view_vector.x = 0.0001f;
+	if ((view.direction.x == 0) && (view.direction.z == 0))			// specialny pripad pri vektore rovnobeznom s osou y (nemozme pouzit vektor y na vypocet kolmeho vektora)
+		view.direction.x = 0.0001f;
 	
 	float3 y_vector = {0, 1, 0}; 
 	if ((cam_angles.y >= -PI/2) && (cam_angles.y <= PI/2)) 
 		y_vector = -y_vector;
-	view_right_plane = cross_product(y_vector, view_vector);		// pravidlo pravej ruky v pravotocivej sustave, vektorove nasobenie vrati pravy uhol na dva vektory
-	view_up_plane = cross_product(view_right_plane, view_vector);
+	view.right_plane = cross_product(y_vector, view.direction);		// pravidlo pravej ruky v pravotocivej sustave, vektorove nasobenie vrati pravy uhol na dva vektory
+	view.up_plane = cross_product(view.right_plane, view.direction);
 
 	//printf("view vector:%4.2f %4.2f %4.2f\nup vector:%4.2f %4.2f %4.2f\nright vector:%4.2f %4.2f %4.2f\n\n", view_vector.x, view_vector.y, view_vector.z, view_up_plane.x, view_up_plane.y, view_up_plane.z, view_right_plane.x, view_right_plane.y, view_right_plane.z);
 
-	view_right_plane = vector_normalize(view_right_plane);		
-	view_up_plane = vector_normalize(view_up_plane);			
-	view_right_plane = view_right_plane * view_px_step;	
-	view_up_plane = view_up_plane * view_px_step;
+	view.right_plane = vector_normalize(view.right_plane);		
+	view.up_plane = vector_normalize(view.up_plane);	
+	float step_px = virtual_size / MINIMUM(width_px, height_px);
+	view.right_plane = view.right_plane * step_px;	
+	view.up_plane = view.up_plane * step_px;
 }
 
-void get_view_ray(int row, int col, float3 *origin, float3 *direction) {
-	*direction = view_vector;
-	*origin = cam_position + (view_right_plane * (float) (col - view_half_px.x));
-	*origin = *origin + (view_up_plane * (float) (row - view_half_px.y));
+Ortho_view get_view() {
+	return view;
 }
+
+
 
 

@@ -1,10 +1,9 @@
 //#include <stdio.h>
 
-#include "data_utils.h"
 #include "math_constants.h"
 
-extern int view_width_half_px, view_height_half_px;
-extern float3 cam_position, view_vector, view_right_plane, view_up_plane;
+#include "data_utils.h"
+#include "projection.h"
 
 extern size_t volume_size;
 extern unsigned char *volume;
@@ -48,18 +47,18 @@ __device__ float2 intersect_3D_cuda(float3 pt, float3 dir, float3 min_bound, flo
 	return make_float2(k1, k2);					
 }
 
-__global__ void render_ray_cuda(float3 min_bound, float3 max_bound, float step, float3 origin, float3 direction, float3 view_right_plane, float3 view_up_plane, unsigned char dev_col_buffer[]) {
+__global__ void render_ray_cuda(float3 min_bound, float3 max_bound, float step, Ortho_view view, unsigned char dev_col_buffer[]) {
 	int col = blockIdx.x * blockDim.x + threadIdx.x;
 	int row = blockIdx.y * blockDim.y + threadIdx.y;
-	if ((col >= WIN_WIDTH) || (row >= WIN_HEIGHT))					// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
+	if ((col >= view.size_px.x) || (row >= view.size_px.y))					// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
 		return;
 
 	float bg = (((col / 16) + (row / 16)) % 2) * 0.3f;
 	float4 bg_color = {bg, bg, bg, 1};
 	float4 color_acc;
 
-	origin = origin + (view_right_plane * (float) (col - (WIN_WIDTH / 2)));
-	origin = origin + (view_up_plane * (float) (row - (WIN_HEIGHT / 2)));
+	float3 origin = {0,0,0}, direction = {0,0,0};
+	view.get_view_ray(col, row, &origin, &direction);
 	float2 k_range = intersect_3D_cuda(origin, direction, min_bound, max_bound);
 
 	if ((k_range.x < k_range.y) && (k_range.y > 0)) {				// nenulovy interval koeficientu k (existuje priesecnica) A vystupny bod lezi na luci
@@ -104,7 +103,7 @@ extern unsigned char *run_kernel(void) {
 	dim3 threads_per_block(threads_dim, threads_dim);				// podla occupancy calculator
 	dim3 num_blocks((WIN_WIDTH + threads_dim - 1) / threads_dim, (WIN_HEIGHT + threads_dim - 1) / threads_dim);		// celociselne delenie, 
 																													// ak su rozmery okna nedelitelne 16, spustaju sa bloky	s nevyuzitimi threadmi
-	render_ray_cuda<<<num_blocks, threads_per_block>>>(min_bound, max_bound, step, cam_position, view_vector, view_right_plane, view_up_plane, dev_col_buffer);
+	render_ray_cuda<<<num_blocks, threads_per_block>>>(min_bound, max_bound, step, get_view(), dev_col_buffer);
 	cudaMemcpy(&col_buffer, dev_col_buffer, DATA_SIZE_CUDA, cudaMemcpyDeviceToHost);
 	return col_buffer;
 }

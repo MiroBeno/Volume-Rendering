@@ -33,7 +33,7 @@ void gl_finalize_PBO() {
 void draw_volume_cuda() {
 	GLubyte *pbo_array = gl_prepare_PBO();
 
-	init_view(WIN_WIDTH, WIN_HEIGHT, 3.5f);	
+	init_view(WIN_WIDTH, WIN_HEIGHT, VIRTUAL_VIEW_SIZE);	
 	unsigned char *col_buffer;
 	col_buffer = run_kernel();
 	for(int i = 0; i < DATA_SIZE; i++)
@@ -48,12 +48,12 @@ void draw_volume() {
 
 	GLubyte *pbo_array = gl_prepare_PBO();
 
-	init_view(WIN_WIDTH, WIN_HEIGHT, 3.5f);	
+	init_view(WIN_WIDTH, WIN_HEIGHT, VIRTUAL_VIEW_SIZE);	
 	float3 origin = {0,0,0}, direction = {0,0,0};
 	for(int row = 0; row < WIN_HEIGHT; row++)
 		for(int col = 0; col < WIN_WIDTH; col++)
 		{	
-			get_view_ray(row, col, &origin, &direction);
+			get_view().get_view_ray(col, row, &origin, &direction);
 			float4 color = render_ray_alt(origin, direction);
 			*pbo_array++ = (unsigned char) map_float_int(color.x,256);
 			*pbo_array++ = (unsigned char) map_float_int(color.y,256);
