@@ -15,12 +15,19 @@ const char *FILE_NAME = "Bucky.raw";						// 32x32x32  x unsigned char
 static int window_id;
 static GLuint pbo_id;
 
-extern unsigned char *render_volume_cuda(void);
-extern void free_cuda(void);
-extern void init_cuda(void);
+static int renderer_id = 1;
 
-extern void init_cpu();
-extern void render_volume_cpu(unsigned char *buffer);
+extern float render_volume_gpu(unsigned char *buffer, Ortho_view ortho_view);
+extern void init_gpu(Volume_model volume_model);
+extern void free_gpu(void);
+
+extern float render_volume_gpu2(unsigned char *buffer, Ortho_view ortho_view);
+extern void init_gpu2(Volume_model volume_model);
+extern void free_gpu2(void);
+
+extern void render_volume_cpu(unsigned char *buffer, Ortho_view ortho_view);
+extern void init_cpu(Volume_model volume_model);
+
 
 GLubyte *gl_prepare_PBO() {
 	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_id);
@@ -33,27 +40,25 @@ void gl_finalize_PBO() {
 	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 }
 
-void draw_volume_cuda() {
-	GLubyte *pbo_array = gl_prepare_PBO();
-
-	init_view(WIN_WIDTH, WIN_HEIGHT, VIRTUAL_VIEW_SIZE);	
-	unsigned char *col_buffer;
-	col_buffer = render_volume_cuda();
-	for(int i = 0; i < DATA_SIZE; i++)					//TODO zbytocne kopirovanie
-			*pbo_array++ = col_buffer[i];
-	gl_finalize_PBO();
-	glutPostRedisplay();
-}
-
 void draw_volume() {
-
-	draw_volume_cuda();return;
-
 	GLubyte *pbo_array = gl_prepare_PBO();
-
 	init_view(WIN_WIDTH, WIN_HEIGHT, VIRTUAL_VIEW_SIZE);
-	render_volume_cpu((unsigned char *)pbo_array);
-
+	float elapsedTime = 0;
+	char fpsString[256] = "Naive Volume Rendering.";
+	switch (renderer_id) {
+		case 1:
+			render_volume_cpu((unsigned char *)pbo_array, get_view());
+			break;
+		case 2 :
+			elapsedTime = render_volume_gpu((unsigned char *)pbo_array, get_view());
+			break;
+		case 3 :
+			elapsedTime = render_volume_gpu2((unsigned char *)pbo_array, get_view());
+			break;
+	}
+	if (elapsedTime > 0)
+		sprintf(fpsString, "Naive Volume Rendering. %3.1f fps", 1000.f / elapsedTime);
+	glutSetWindowTitle(fpsString);
 	gl_finalize_PBO();
 	glutPostRedisplay();
 }
@@ -94,7 +99,7 @@ void keyboard_callback(unsigned char key, int x, int y) {
 	if (key=='v') {
 		draw_volume();
 	}
-	if (strchr("wsadqe1234", key)) {
+	if (strchr("wsadqe1234567890", key)) {
 		switch (key) {
 			case 'w': camera_up(); break;
 			case 's': camera_down(); break;
@@ -102,17 +107,21 @@ void keyboard_callback(unsigned char key, int x, int y) {
 			case 'd': camera_right(); break;
 			case 'q': camera_zoom_in(); break;
 			case 'e': camera_zoom_out(); break;
-			case '1': set_camera_position_deg(2,45,45); break;
-			case '2': set_camera_position_deg(2,135,225); break;
-			case '3': set_camera_position_deg(2,225,225); break;
-			case '4': set_camera_position_deg(2,0,0); break;
+			case '1': renderer_id = 1; break;
+			case '2': renderer_id = 2; break;
+			case '3': renderer_id = 3; break;
+			case '7': set_camera_position_deg(2,45,45); break;
+			case '8': set_camera_position_deg(2,135,225); break;
+			case '9': set_camera_position_deg(2,225,225); break;
+			case '0': set_camera_position_deg(2,0,0); break;
 		}
 		draw_volume();
 	}
 	if (key=='z') {
 		glutDestroyWindow(window_id);
 		glDeleteBuffersARB(1, &pbo_id);
-		free_cuda();
+		free_gpu();
+		free_gpu2();
 		exit(0);
 	}
 
@@ -141,16 +150,16 @@ int main(int argc, char **argv) {
 	}
 	printf("Using GLEW %s\n", glewGetString(GLEW_VERSION));
 	if (!GLEW_VERSION_2_0) {
-		printf("OpenGL 2.0 is not supported. Exiting...\n");
+		printf("Error: OpenGL 2.0 is not supported.\n");
 		glutDestroyWindow(window_id);
 		exit(1);
 	}
-	printf("OpenGL 2.0 is supported.\n");
 
 	glGenBuffersARB(1, &pbo_id);					// pouzivat ARB extensions metody, alebo nativne?
 
-	init_cuda();
-	init_cpu();
+	init_cpu(get_model());
+	init_gpu(get_model());
+	init_gpu2(get_model());
 	draw_volume();
 	glutMainLoop();
 	return 0;

@@ -2,7 +2,6 @@
 #define _DATA_UTILS_H_
 
 #include <math.h>
-//#include <float.h>
 
 #include "host_defines.h"
 #include "vector_types.h"

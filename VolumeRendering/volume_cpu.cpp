@@ -4,7 +4,6 @@
 
 static const float4 bg_color = {0.5,0.5,0.5,1};			// opacity backgroundu je 1
 
-static unsigned char *volume_data = NULL;
 static Volume_model volume;
 static Ortho_view view;
 
@@ -32,7 +31,7 @@ float2 intersect_3D(float3 pt, float3 dir, float3 min_bound, float3 max_bound) {
 	return make_float2(k1, k2);					// pri vypocte k mozu vzniknut artefakty, a hodnoty mozu byt mimo volume, mozno riesit k +-= 0.00001f; alebo clampovanim vysledku na stenu
 }
 
-float4 render_ray(float3 origin, float3 direction) {
+float4 render_ray_cpu(float3 origin, float3 direction) {
 	float2 k_range = intersect_3D(origin, direction, volume.min_bound, volume.max_bound);
 	if ((k_range.x > k_range.y) || (k_range.y < 0))				// prazdny interval koeficientu k = nie je presecnik ALEBO vystupny priesecnik je za bodom vzniku luca
 		return bg_color;
@@ -41,7 +40,7 @@ float4 render_ray(float3 origin, float3 direction) {
 	float4 color_acc = {0,0,0,0};
 	for (float k = k_range.x; k <= k_range.y; k += volume.ray_step) {		
 		float3 pt = origin + (direction * k);
-		float4 color_cur = volume.sample_color(pt, volume_data);
+		float4 color_cur = volume.sample_color(pt);
 		color_cur.x *= color_cur.w;								// transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
 		color_cur.y *= color_cur.w;
 		color_cur.z *= color_cur.w;
@@ -53,19 +52,18 @@ float4 render_ray(float3 origin, float3 direction) {
 	return color_acc;
 }
 
-extern void init_cpu() {
-	volume = get_model();
-	get_volume_data(&volume_data);
+extern void init_cpu(Volume_model volume_model) {
+	volume = volume_model;
 }
 
-extern void render_volume_cpu(unsigned char *buffer) {
-	view = get_view();
+extern void render_volume_cpu(unsigned char *buffer, Ortho_view ortho_view) {
+	view = ortho_view;
 	float3 origin = {0,0,0}, direction = {0,0,0};
 	for(int row = 0; row < WIN_HEIGHT; row++)
 		for(int col = 0; col < WIN_WIDTH; col++)
 		{	
 			view.get_view_ray(col, row, &origin, &direction);
-			float4 color = render_ray(origin, direction);
+			float4 color = render_ray_cpu(origin, direction);
 			*buffer++ = (unsigned char) map_float_int(color.x,256);
 			*buffer++ = (unsigned char) map_float_int(color.y,256);
 			*buffer++ = (unsigned char) map_float_int(color.z,256);
@@ -76,7 +74,7 @@ extern void render_volume_cpu(unsigned char *buffer) {
 
 //////////////////
 //OLD CODE
-/////////////////
+//////////////////
 
 float2 k_range = {0,0};
 float4 color_acc = {0,0,0,0}, color_cur = {0,0,0,0};
@@ -119,7 +117,7 @@ float4 render_ray_alt(float3 origin, float3 direction) {
 		pnt.x = origin.x + direction.x * k;
 		pnt.y = origin.y + direction.y * k;
 		pnt.z = origin.z + direction.z * k;
-		color_cur = volume.sample_color(pnt, volume_data);
+		color_cur = volume.sample_color(pnt);
 		color_cur.x *= color_cur.w;								
 		color_cur.y *= color_cur.w;
 		color_cur.z *= color_cur.w;
