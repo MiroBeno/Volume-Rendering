@@ -7,32 +7,8 @@ static const float4 bg_color = {0.5,0.5,0.5,1};			// opacity backgroundu je 1
 static Volume_model volume;
 static Ortho_view view;
 
-float2 intersect_1D(float pt, float dir, float min_bound, float max_bound) {
-	if (dir == 0) {											// ak je zlozka vektora rovnobezna so stenou kocky
-		if ((pt < min_bound) || (pt > max_bound))			// ak nelezi bod v romedzi kocky v danej osi
-			return make_float2(POS_INF, NEG_INF);			// interval bude nulovy
-		else
-			return make_float2(NEG_INF, POS_INF);			// inak interval bude nekonecny
-	}
-	float k1 = (min_bound - pt) / dir;
-	float k2 = (max_bound - pt) / dir;
-	return k1 <= k2 ? make_float2(k1, k2) : make_float2(k2, k1); // skontroluj opacny vektor
-}
-
-float2 intersect_3D(float3 pt, float3 dir, float3 min_bound, float3 max_bound) {
-	float2 xRange = intersect_1D(pt.x, dir.x, min_bound.x, max_bound.x);
-	float2 yRange = intersect_1D(pt.y, dir.y, min_bound.y, max_bound.y);
-	float2 zRange = intersect_1D(pt.z, dir.z, min_bound.z, max_bound.z);
-	float k1 = xRange.x, k2 = xRange.y;
-	if (yRange.x > k1) k1 = yRange.x;
-	if (zRange.x > k1) k1 = zRange.x;
-	if (yRange.y < k2) k2 = yRange.y;
-	if (zRange.y < k2) k2 = zRange.y;
-	return make_float2(k1, k2);					// pri vypocte k mozu vzniknut artefakty, a hodnoty mozu byt mimo volume, mozno riesit k +-= 0.00001f; alebo clampovanim vysledku na stenu
-}
-
 float4 render_ray_cpu(float3 origin, float3 direction) {
-	float2 k_range = intersect_3D(origin, direction, volume.min_bound, volume.max_bound);
+	float2 k_range = volume.intersect(origin, direction);
 	if ((k_range.x > k_range.y) || (k_range.y < 0))				// prazdny interval koeficientu k = nie je presecnik ALEBO vystupny priesecnik je za bodom vzniku luca
 		return bg_color;
 	if ((k_range.x < 0))										// bod vzniku luca je vnutri kocky, zaciname nie vstupnym priesecnikom, ale bodom vzniku

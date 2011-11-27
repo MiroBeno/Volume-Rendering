@@ -2,8 +2,6 @@
 #include "projection.h"
 
 const float2 distance_limits = {10, 0.1f};
-const float2 d_angles = {DEG_TO_RAD(10.0f), DEG_TO_RAD(5.0f)};
-const float d_distance = 0.1f;
 
 static float2 cam_angles = {0,0};			// x - horizontalny uhol, y - vertikalny uhol
 static float cam_distance = 2; 
@@ -26,41 +24,41 @@ float3 compute_camera_position() {
 	return cam_position;
 }
 
-float3 camera_up() {
-	cam_angles.y -= d_angles.y;
+float3 camera_up(float angle) {
+	cam_angles.y -= DEG_TO_RAD(angle);
 	while (cam_angles.y < -PI) 
 		cam_angles.y += 2 * PI;
 	return compute_camera_position();
 }
 
-float3 camera_down() {
-	cam_angles.y += d_angles.y;
+float3 camera_down(float angle) {
+	cam_angles.y += DEG_TO_RAD(angle);
 	while (cam_angles.y >= PI) 
 		cam_angles.y -= 2 * PI;
 	return compute_camera_position();
 }
 
-float3 camera_left() {
-	cam_angles.x -= d_angles.x; 
+float3 camera_left(float angle) {
+	cam_angles.x -= DEG_TO_RAD(angle); 
 	while (cam_angles.x < 0) 
 		cam_angles.x += 2 * PI;
 	return compute_camera_position();
 }
 
-float3 camera_right() {
-	cam_angles.x += d_angles.x; 
+float3 camera_right(float angle) {
+	cam_angles.x += DEG_TO_RAD(angle); 
 	while (cam_angles.x >= 2 * PI) 
 		cam_angles.x -= 2 * PI;
 	return compute_camera_position();
 }
 
-float3 camera_zoom_in() {
-	cam_distance = MAXIMUM(cam_distance - d_distance, distance_limits.y);
+float3 camera_zoom_in(float distance) {
+	cam_distance = MAXIMUM(cam_distance - distance, distance_limits.y);
 	return compute_camera_position();
 }
 
-float3 camera_zoom_out() {
-	cam_distance = MINIMUM(cam_distance + d_distance, distance_limits.x);
+float3 camera_zoom_out(float distance) {
+	cam_distance = MINIMUM(cam_distance + distance, distance_limits.x);
 	return compute_camera_position();
 }
 
@@ -71,7 +69,7 @@ float3 set_camera_position_deg(float distance, float vert_angle, float horiz_ang
 	return compute_camera_position();
 }
 
-void init_view(int width_px, int height_px, float virtual_size) {
+void update_view(int width_px, int height_px, float virtual_size) {
 	view.size_px.x = width_px; 
 	view.size_px.y = height_px;
 	view.half_px.x = width_px / 2; 

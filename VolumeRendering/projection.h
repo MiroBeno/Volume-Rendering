@@ -22,15 +22,15 @@ struct Ortho_view {
 	}
 };
 
-float3 camera_up();
-float3 camera_down();
-float3 camera_left();
-float3 camera_right();
-float3 camera_zoom_in();
-float3 camera_zoom_out();
+float3 camera_up(float angle);
+float3 camera_down(float angle);
+float3 camera_left(float angle);
+float3 camera_right(float angle);
+float3 camera_zoom_in(float distance);
+float3 camera_zoom_out(float distance);
 float3 set_camera_position_deg(float distance, float vert_angle, float horiz_angle);
 
-void init_view(int width_px, int height_px, float size);
+void update_view(int width_px, int height_px, float size);
 Ortho_view get_view();
 
 #endif

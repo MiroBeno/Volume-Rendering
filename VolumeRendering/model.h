@@ -4,7 +4,7 @@
 #include "data_utils.h"
 
 //const float POS_INF = FLT_MAX, NEG_INF = FLT_MIN;
-//CUDART_MAX_NORMAL_F, CUDART_MIN_DENORM_F
+//CUDART_MAX_NORMAL_F, CUDART_MIN_NORMAL_F
 #define POS_INF 10000
 #define NEG_INF -10000
 
@@ -14,7 +14,7 @@ struct Volume_model {
 	cudaExtent dims;		
 	float3 min_bound;
 	float3 max_bound;
-	float ray_step;											
+	float ray_step;	
 
 	__host__ __device__ float sample_data(float3 pos) {
 		unsigned char sample = data[
@@ -37,9 +37,31 @@ struct Volume_model {
 	#else
 		float4 color = {(pos.x+1)*0.5f, (pos.y+1)*0.5f, (pos.z+1)*0.5f, 0.1f};  // prepocitanie polohy bodu <-1;1>(x,y,z) na float vyjadrenie farby <0;1>(r,g,b,1)
 		return color;	
-		//point = (pos + make_float3(1,1,1)) * 0.5f;	
-		//return make_float4(pos.x, pos.y, pos.z, 0.1f);	
 	#endif
+	}
+
+	__host__ __device__ float2 intersect_1D(float pt, float dir, float min_bound, float max_bound) {
+		if (dir == 0) {											// ak je zlozka vektora rovnobezna so stenou kocky
+			if ((pt < min_bound) || (pt > max_bound))			// ak nelezi bod v romedzi kocky v danej osi
+				return make_float2(POS_INF, NEG_INF);			// interval bude nulovy
+			else
+				return make_float2(NEG_INF, POS_INF);			// inak interval bude nekonecny
+		}
+		float k1 = (min_bound - pt) / dir;
+		float k2 = (max_bound - pt) / dir;
+		return k1 <= k2 ? make_float2(k1, k2) : make_float2(k2, k1); // skontroluj opacny vektor
+	}
+
+	__host__ __device__ float2 intersect(float3 pt, float3 dir) {
+		float2 xRange = intersect_1D(pt.x, dir.x, min_bound.x, max_bound.x);
+		float2 yRange = intersect_1D(pt.y, dir.y, min_bound.y, max_bound.y);
+		float2 zRange = intersect_1D(pt.z, dir.z, min_bound.z, max_bound.z);
+		float k1 = xRange.x, k2 = xRange.y;
+		if (yRange.x > k1) k1 = yRange.x;
+		if (zRange.x > k1) k1 = zRange.x;
+		if (yRange.y < k2) k2 = yRange.y;
+		if (zRange.y < k2) k2 = zRange.y;
+		return make_float2(k1, k2);					// pri vypocte k mozu vzniknut artefakty, a hodnoty mozu byt mimo volume, mozno riesit k +-= 0.00001f; alebo clampovanim vysledku na stenu
 	}
 
 };

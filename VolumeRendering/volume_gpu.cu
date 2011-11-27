@@ -12,30 +12,6 @@ static unsigned char *dev_buffer;
 static cudaEvent_t start, stop; 
 static float elapsedTime;
 
-__device__ float2 intersect_1D_gpu(float pt, float dir, float min_bound, float max_bound) {
-	if (dir == 0) {											// ak je zlozka vektora rovnobezna so stenou kocky
-		if ((pt < min_bound) || (pt > max_bound))			// ak nelezi bod v romedzi kocky v danej osi
-			return make_float2(POS_INF, NEG_INF);			// interval bude nulovy
-		else
-			return make_float2(NEG_INF, POS_INF);			// inak interval bude nekonecny
-	}
-	float k1 = (min_bound - pt) / dir;
-	float k2 = (max_bound - pt) / dir;
-	return k1 <= k2 ? make_float2(k1, k2) : make_float2(k2, k1); // skontroluj opacny vektor
-}
-
-__device__ float2 intersect_3D_gpu(float3 pt, float3 dir, float3 min_bound, float3 max_bound) {
-	float2 xRange = intersect_1D_gpu(pt.x, dir.x, min_bound.x, max_bound.x);
-	float2 yRange = intersect_1D_gpu(pt.y, dir.y, min_bound.y, max_bound.y);
-	float2 zRange = intersect_1D_gpu(pt.z, dir.z, min_bound.z, max_bound.z);
-	float k1 = xRange.x, k2 = xRange.y;
-	if (yRange.x > k1) k1 = yRange.x;
-	if (zRange.x > k1) k1 = zRange.x;
-	if (yRange.y < k2) k2 = yRange.y;
-	if (zRange.y < k2) k2 = zRange.y;
-	return make_float2(k1, k2);					
-}
-
 __global__ void render_ray_gpu(Volume_model volume, Ortho_view view, unsigned char dev_buffer[]) {
 	int col = blockIdx.x * blockDim.x + threadIdx.x;
 	int row = blockIdx.y * blockDim.y + threadIdx.y;
@@ -48,7 +24,7 @@ __global__ void render_ray_gpu(Volume_model volume, Ortho_view view, unsigned ch
 
 	float3 origin = {0,0,0}, direction = {0,0,0};
 	view.get_view_ray(col, row, &origin, &direction);
-	float2 k_range = intersect_3D_gpu(origin, direction, volume.min_bound, volume.max_bound);
+	float2 k_range = volume.intersect(origin, direction);
 
 	if ((k_range.x < k_range.y) && (k_range.y > 0)) {				// nenulovy interval koeficientu k (existuje priesecnica) A vystupny bod lezi na luci
 		if ((k_range.x < 0))										// bod vzniku luca je vnutri kocky, zaciname nie vstupnym priesecnikom, ale bodom vzniku

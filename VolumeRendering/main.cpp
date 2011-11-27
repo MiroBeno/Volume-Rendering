@@ -16,6 +16,7 @@ static int window_id;
 static GLuint pbo_id;
 
 static int renderer_id = 1;
+static bool auto_rotate = true;
 
 extern float render_volume_gpu(unsigned char *buffer, Ortho_view ortho_view);
 extern void init_gpu(Volume_model volume_model);
@@ -46,7 +47,7 @@ void gl_finalize_PBO() {
 
 void draw_volume() {
 	GLubyte *pbo_array = gl_prepare_PBO();
-	init_view(WIN_WIDTH, WIN_HEIGHT, VIRTUAL_VIEW_SIZE);
+	update_view(WIN_WIDTH, WIN_HEIGHT, VIRTUAL_VIEW_SIZE);
 	float elapsedTime = 0;
 	char titleString[256] = "Naive Volume Rendering. ";
 	char appendString[256] = "";
@@ -87,10 +88,10 @@ void draw_random() {
 }
 
 void display_callback(void) {
-		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_id);
-		glDrawPixels(WIN_WIDTH, WIN_HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
-		glutSwapBuffers();
+	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_id);
+	glDrawPixels(WIN_WIDTH, WIN_HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
+	glutSwapBuffers();
 }
 
 void keyboard_callback(unsigned char key, int x, int y) {
@@ -100,7 +101,7 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		glutWireTeapot(0.5);
 		glutSwapBuffers();
 	}
-	if (key=='r') {
+	if (key=='y') {
 		draw_random();
 	}
 	if (key=='b') {
@@ -109,14 +110,17 @@ void keyboard_callback(unsigned char key, int x, int y) {
 	if (key=='v') {
 		draw_volume();
 	}
+	if (key=='r') {
+		auto_rotate = !auto_rotate;
+	}
 	if (strchr("wsadqe1234567890", key)) {
 		switch (key) {
-			case 'w': camera_up(); break;
-			case 's': camera_down(); break;
-			case 'a': camera_left(); break;
-			case 'd': camera_right(); break;
-			case 'q': camera_zoom_in(); break;
-			case 'e': camera_zoom_out(); break;
+			case 'w': camera_up(5.0f); break;
+			case 's': camera_down(5.0f); break;
+			case 'a': camera_left(5.0f); break;
+			case 'd': camera_right(5.0f); break;
+			case 'q': camera_zoom_in(0.1f); break;
+			case 'e': camera_zoom_out(0.1f); break;
 			case '1': renderer_id = 1; break;
 			case '2': renderer_id = 2; break;
 			case '3': renderer_id = 3; break;
@@ -128,7 +132,7 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		}
 		draw_volume();
 	}
-	if (key=='z') {
+	if (key==27) {
 		glutDestroyWindow(window_id);
 		glDeleteBuffersARB(1, &pbo_id);
 		free_gpu();
@@ -137,6 +141,15 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		exit(0);
 	}
 
+}
+
+void idle_callback()
+{
+	if (auto_rotate) {
+		camera_left(1.0f);
+		camera_up(1.0f);
+		draw_volume();
+	}
 }
 
 int main(int argc, char **argv) {
@@ -153,6 +166,8 @@ int main(int argc, char **argv) {
 	window_id = glutCreateWindow("Naive Volume Rendering");
 	glutDisplayFunc(display_callback);
 	glutKeyboardFunc(keyboard_callback);
+	//glutReshapeFunc(reshape_callback);
+    glutIdleFunc(idle_callback);
 
 	GLenum err = glewInit();
 	if (GLEW_OK != err) {
