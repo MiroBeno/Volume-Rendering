@@ -6,6 +6,8 @@
 #include "host_defines.h"
 #include "vector_types.h"
 #include "vector_functions.h"
+#include "driver_types.h"
+#include "driver_functions.h"
 
 #define PI 3.141592654f
 #define MAXIMUM(a,b) ((a)>(b)?(a):(b))

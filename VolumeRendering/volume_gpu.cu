@@ -42,7 +42,7 @@ __global__ void render_ray_gpu(Volume_model volume, Ortho_view view, unsigned ch
 	if ((col >= view.size_px.x) || (row >= view.size_px.y))					// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
 		return;
 
-	float bg = (((col / 16) + (row / 16)) % 2) * 0.3f;
+	float bg = (((col / 16) + (row / 16)) % 2) * 0.1f;
 	float4 bg_color = {bg, bg, bg, 1};
 	float4 color_acc;
 

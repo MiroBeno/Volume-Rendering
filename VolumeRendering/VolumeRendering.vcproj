@@ -209,6 +209,10 @@
 				RelativePath=".\volume_gpu_2.cu"
 				>
 			</File>
+			<File
+				RelativePath=".\volume_gpu_3.cu"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
