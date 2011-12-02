@@ -11,16 +11,16 @@
 struct Volume_model {
 	unsigned char *data;
 	unsigned int size;
-	cudaExtent dims;		
+	int3 dims;		
 	float3 min_bound;
 	float3 max_bound;
 	float ray_step;	
 
 	__host__ __device__ float sample_data(float3 pos) {
 		unsigned char sample = data[
-			map_float_int((pos.z + 1)*0.5f, dims.depth) * dims.width * dims.height +
-			map_float_int((pos.y + 1)*0.5f, dims.height) * dims.width +
-			map_float_int((pos.x + 1)*0.5f, dims.width)
+			map_float_int((pos.z + 1)*0.5f, dims.z) * dims.x * dims.y +
+			map_float_int((pos.y + 1)*0.5f, dims.y) * dims.x +
+			map_float_int((pos.x + 1)*0.5f, dims.x)
 		];
 		return (sample / 255.0f); 
 	}

@@ -4,16 +4,18 @@
 #include "projection.h"
 #include "model.h"
 
+#include "cuda_runtime_api.h"
+
 const int BUFFER_SIZE_CUDA = WIN_WIDTH * WIN_HEIGHT * 4;
 
 static __constant__ Volume_model volume;
 static __constant__ Ortho_view view;
-static unsigned char *dev_buffer;
+static uchar4 *dev_buffer;
 
 static cudaEvent_t start, stop; 
 static float elapsedTime;
 
-__global__ void render_ray_gpu2(unsigned char dev_buffer[]) {
+__global__ void render_ray_gpu2(uchar4 dev_buffer[]) {
 	int col = blockIdx.x * blockDim.x + threadIdx.x;
 	int row = blockIdx.y * blockDim.y + threadIdx.y;
 	if ((col >= view.size_px.x) || (row >= view.size_px.y))					// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
@@ -47,11 +49,11 @@ __global__ void render_ray_gpu2(unsigned char dev_buffer[]) {
 		color_acc = bg_color;
 	}
 
-	int offset = (row * WIN_WIDTH + col) * 4;
-	dev_buffer[offset + 0] = map_float_int(color_acc.x,256);
-	dev_buffer[offset + 1] = map_float_int(color_acc.y,256);
-	dev_buffer[offset + 2] = map_float_int(color_acc.z,256);
-	dev_buffer[offset + 3] = 255;
+	int offset = (row * WIN_WIDTH + col);
+	dev_buffer[offset].x = map_float_int(color_acc.x,256);
+	dev_buffer[offset].y = map_float_int(color_acc.y,256);
+	dev_buffer[offset].z = map_float_int(color_acc.z,256);
+	dev_buffer[offset].w = 255;
 }
 
 extern void init_gpu2(Volume_model volume_model) {
@@ -72,7 +74,7 @@ extern void free_gpu2(void) {
 	cudaEventDestroy(stop);
 }
 
-extern float render_volume_gpu2(unsigned char *buffer, Ortho_view ortho_view) {
+extern float render_volume_gpu2(uchar4 *buffer, Ortho_view ortho_view) {
 	int threads_dim = 16;
 	dim3 threads_per_block(threads_dim, threads_dim);				// podla occupancy calculator
 	dim3 num_blocks((WIN_WIDTH + threads_dim - 1) / threads_dim, (WIN_HEIGHT + threads_dim - 1) / threads_dim);		// celociselne delenie, 

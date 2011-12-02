@@ -9,8 +9,12 @@
 #include "model.h"
 #include "projection.h"
 
+//#include "cuda_runtime.h"
+//#include "cuda_runtime_api.h"
+
 const GLsizeiptr DATA_SIZE = WIN_WIDTH * WIN_HEIGHT * 4;	// int CHANNEL_COUNT = 4;
 const char *FILE_NAME = "Bucky.raw";						// 32x32x32  x unsigned char
+//const char *FILE_NAME = "nucleon.raw";						// 41x41x41  x unsigned char
 
 static int window_id;
 static GLuint pbo_id;
@@ -18,31 +22,31 @@ static GLuint pbo_id;
 static int renderer_id = 1;
 static bool auto_rotate = true;
 
-extern float render_volume_gpu(unsigned char *buffer, Ortho_view ortho_view);
+extern float render_volume_gpu(uchar4 *buffer, Ortho_view ortho_view);
 extern void init_gpu(Volume_model volume_model);
 extern void free_gpu(void);
 
-extern float render_volume_gpu2(unsigned char *buffer, Ortho_view ortho_view);
+extern float render_volume_gpu2(uchar4 *buffer, Ortho_view ortho_view);
 extern void init_gpu2(Volume_model volume_model);
 extern void free_gpu2(void);
 
-extern float render_volume_gpu3(unsigned char *buffer, Ortho_view ortho_view);
+extern float render_volume_gpu3(uchar4 *buffer, Ortho_view ortho_view);
 extern void init_gpu3(Volume_model volume_model);
 extern void free_gpu3(void);
 
 extern void render_volume_cpu(unsigned char *buffer, Ortho_view ortho_view);
 extern void init_cpu(Volume_model volume_model);
 
+extern cudaEvent_t start, stop;
+extern float elapsedTime;
+
 
 GLubyte *gl_prepare_PBO() {
-	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_id);
-	glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, DATA_SIZE, NULL, GL_DYNAMIC_DRAW_ARB);
 	return (GLubyte *) glMapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY_ARB);
 }
 
 void gl_finalize_PBO() {
 	glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB);
-	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 }
 
 void draw_volume() {
@@ -56,15 +60,15 @@ void draw_volume() {
 			render_volume_cpu((unsigned char *)pbo_array, get_view());
 			break;
 		case 2 :
-			elapsedTime = render_volume_gpu((unsigned char *)pbo_array, get_view());
+			elapsedTime = render_volume_gpu((uchar4 *)pbo_array, get_view());
 			sprintf(appendString, "Standard CUDA @ %3.1f fps", 1000.f / elapsedTime);
 			break;
 		case 3 :
-			elapsedTime = render_volume_gpu2((unsigned char *)pbo_array, get_view());
+			elapsedTime = render_volume_gpu2((uchar4 *)pbo_array, get_view());
 			sprintf(appendString, "Constant Memory @ %3.1f fps", 1000.f / elapsedTime);
 			break;
 		case 4 :
-			elapsedTime = render_volume_gpu3((unsigned char *)pbo_array, get_view());
+			elapsedTime = render_volume_gpu3((uchar4 *)pbo_array, get_view());
 			sprintf(appendString, "CM + 3D Texture Memory @ %3.1f fps", 1000.f / elapsedTime);
 			break;
 	}
@@ -88,10 +92,17 @@ void draw_random() {
 }
 
 void display_callback(void) {
-	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_id);
 	glDrawPixels(WIN_WIDTH, WIN_HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
-	glutSwapBuffers();
+	//glutSwapBuffers();
+
+/*	cudaEventRecord(stop, 0);
+	cudaEventSynchronize(stop);
+	cudaEventElapsedTime(&elapsedTime, start, stop);
+	char titleString[256] = "Naive Volume Rendering. ";
+	char appendString[256] = "";
+	sprintf(appendString, "Test @ %3.1f fps", 1000.f / elapsedTime);
+	strcat(titleString, appendString);
+	glutSetWindowTitle(titleString);*/
 }
 
 void keyboard_callback(unsigned char key, int x, int y) {
@@ -99,7 +110,7 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		glClearColor(1,0,0,1);
 		glClear(GL_COLOR_BUFFER_BIT);
 		glutWireTeapot(0.5);
-		glutSwapBuffers();
+		//glutSwapBuffers();
 	}
 	if (key=='y') {
 		draw_random();
@@ -134,6 +145,7 @@ void keyboard_callback(unsigned char key, int x, int y) {
 	}
 	if (key==27) {
 		glutDestroyWindow(window_id);
+		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 		glDeleteBuffersARB(1, &pbo_id);
 		free_gpu();
 		free_gpu2();
@@ -160,9 +172,9 @@ int main(int argc, char **argv) {
 	}
 
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
+	glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);		//GLUT_DOUBLE (+ glutSwapBuffers().  Rozdiely? Pomalsie pri dobule znacne, aj ked sa meria iba cas kernelu!)
 	glutInitWindowSize(WIN_WIDTH, WIN_HEIGHT);
-	glutInitWindowPosition(100,100);
+	glutInitWindowPosition(100,1);
 	window_id = glutCreateWindow("Naive Volume Rendering");
 	glutDisplayFunc(display_callback);
 	glutKeyboardFunc(keyboard_callback);
@@ -182,7 +194,9 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
-	glGenBuffersARB(1, &pbo_id);					
+	glGenBuffersARB(1, &pbo_id);	
+	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_id);
+	glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, DATA_SIZE, NULL, GL_DYNAMIC_DRAW_ARB);
 
 	init_cpu(get_model());
 	init_gpu(get_model());
