@@ -15,7 +15,7 @@ uchar4 *dev_buffer;
 cudaEvent_t start, stop; 
 float elapsedTime;
 
-__global__ void render_ray_gpu(Volume_model volume, Ortho_view view, uchar4 dev_buffer[]) {
+__global__ void render_ray_gpu(Volume_model volume, View view, uchar4 dev_buffer[]) {
 	int col = blockIdx.x * blockDim.x + threadIdx.x;
 	int row = blockIdx.y * blockDim.y + threadIdx.y;
 	if ((col >= view.size_px.x) || (row >= view.size_px.y))					// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
@@ -26,7 +26,7 @@ __global__ void render_ray_gpu(Volume_model volume, Ortho_view view, uchar4 dev_
 	float4 color_acc;
 
 	float3 origin = {0,0,0}, direction = {0,0,0};
-	view.get_view_ray(col, row, &origin, &direction);
+	view.get_ortho_ray(col, row, &origin, &direction);
 	float2 k_range = volume.intersect(origin, direction);
 
 	if ((k_range.x < k_range.y) && (k_range.y > 0)) {				// nenulovy interval koeficientu k (existuje priesecnica) A vystupny bod lezi na luci
@@ -74,13 +74,13 @@ extern void free_gpu() {
 	cudaEventDestroy(stop);
 }
 
-extern float render_volume_gpu(uchar4 *buffer, Ortho_view ortho_view) {
+extern float render_volume_gpu(uchar4 *buffer, View current_view) {
 	int threads_dim = 16;
 	dim3 threads_per_block(threads_dim, threads_dim);				// podla occupancy calculator
 	dim3 num_blocks((WIN_WIDTH + threads_dim - 1) / threads_dim, (WIN_HEIGHT + threads_dim - 1) / threads_dim);		// celociselne delenie, 
 																													// ak su rozmery okna nedelitelne 16, spustaju sa bloky	s nevyuzitimi threadmi
 	cudaEventRecord(start, 0);
-	render_ray_gpu<<<num_blocks, threads_per_block>>>(volume_model, ortho_view, dev_buffer);
+	render_ray_gpu<<<num_blocks, threads_per_block>>>(volume_model, current_view, dev_buffer);
 	cudaMemcpy(buffer, dev_buffer, BUFFER_SIZE_CUDA, cudaMemcpyDeviceToHost);
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);

@@ -5,7 +5,7 @@
 static const float4 bg_color = {0.5,0.5,0.5,1};			// opacity backgroundu je 1
 
 static Volume_model volume;
-static Ortho_view view;
+static View view;
 
 float4 render_ray_cpu(float3 origin, float3 direction) {
 	float2 k_range = volume.intersect(origin, direction);
@@ -32,13 +32,13 @@ extern void init_cpu(Volume_model volume_model) {
 	volume = volume_model;
 }
 
-extern void render_volume_cpu(unsigned char *buffer, Ortho_view ortho_view) {
-	view = ortho_view;
+extern void render_volume_cpu(unsigned char *buffer, View current_view) {
+	view = current_view;
 	float3 origin = {0,0,0}, direction = {0,0,0};
 	for(int row = 0; row < WIN_HEIGHT; row++)
 		for(int col = 0; col < WIN_WIDTH; col++)
 		{	
-			view.get_view_ray(col, row, &origin, &direction);
+			view.get_ortho_ray(col, row, &origin, &direction);
 			float4 color = render_ray_cpu(origin, direction);
 			*buffer++ = (unsigned char) map_float_int(color.x,256);
 			*buffer++ = (unsigned char) map_float_int(color.y,256);

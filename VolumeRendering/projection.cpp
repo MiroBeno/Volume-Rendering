@@ -7,7 +7,7 @@ static float2 cam_angles = {0,0};			// x - horizontalny uhol, y - vertikalny uho
 static float cam_distance = 2; 
 static float3 cam_position = {2, 0, 0};
 
-static Ortho_view view = {	{WIN_WIDTH, WIN_HEIGHT}, 
+static View view = {	{WIN_WIDTH, WIN_HEIGHT}, 
 							{WIN_WIDTH / 2, WIN_HEIGHT / 2}, 
 							{2, 0, 0},
 							{-1, 0, 0},
@@ -95,7 +95,7 @@ void update_view(int width_px, int height_px, float virtual_size) {
 	view.up_plane = view.up_plane * step_px;
 }
 
-Ortho_view get_view() {
+View get_view() {
 	return view;
 }
 

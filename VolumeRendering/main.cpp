@@ -12,6 +12,7 @@
 #include "cuda_runtime_api.h"
 #include "cuda_gl_interop.h"
 
+const int timer_msecs = 1;
 const GLsizeiptr DATA_SIZE = WIN_WIDTH * WIN_HEIGHT * 4;	// int CHANNEL_COUNT = 4;
 const char *FILE_NAME = "Bucky.raw";						// 32x32x32  x unsigned char
 //const char *FILE_NAME = "nucleon.raw";					// 41x41x41  x unsigned char
@@ -25,22 +26,22 @@ static cudaGraphicsResource *pbo_cuda_id;
 static int renderer_id = 2;
 static bool auto_rotate = true;
 
-extern float render_volume_gpu(uchar4 *buffer, Ortho_view ortho_view);
+extern float render_volume_gpu(uchar4 *buffer, View current_view);
 extern void init_gpu(Volume_model volume);
 extern void free_gpu();
 
-extern float render_volume_gpu2(uchar4 *buffer, Ortho_view ortho_view);
+extern float render_volume_gpu2(uchar4 *buffer, View current_view);
 extern void init_gpu2();
 
-extern float render_volume_gpu3(uchar4 *buffer, Ortho_view ortho_view);
+extern float render_volume_gpu3(uchar4 *buffer, View current_view);
 extern void init_gpu3();
 extern void free_gpu3();
 
-extern float render_volume_gpu4(uchar4 *buffer, Ortho_view ortho_view);
+extern float render_volume_gpu4(uchar4 *buffer, View current_view);
 extern void init_gpu4();
 extern void free_gpu4();
 
-extern void render_volume_cpu(unsigned char *buffer, Ortho_view ortho_view);
+extern void render_volume_cpu(unsigned char *buffer, View current_view);
 extern void init_cpu(Volume_model volume_model);
 
 uchar4 *prepare_PBO() {							//GLubyte *
@@ -116,6 +117,16 @@ void display_callback(void) {
 	//glutSwapBuffers();
 }
 
+void timer_callback(int value)
+{
+	if (auto_rotate) {
+		camera_left(1.0f);
+		camera_up(1.0f);
+		draw_volume();
+		glutTimerFunc(timer_msecs, timer_callback, 0);
+	}
+}
+
 void keyboard_callback(unsigned char key, int x, int y) {
 	if (key=='t') {
 		glClearColor(1,0,0,1);
@@ -134,6 +145,7 @@ void keyboard_callback(unsigned char key, int x, int y) {
 	}
 	if (key=='r') {
 		auto_rotate = !auto_rotate;
+		glutTimerFunc(timer_msecs, timer_callback, 0);
 	}
 	if (strchr("wsadqe1234567890", key)) {
 		switch (key) {
@@ -168,15 +180,6 @@ void keyboard_callback(unsigned char key, int x, int y) {
 
 }
 
-void idle_callback()
-{
-	if (auto_rotate) {
-		camera_left(1.0f);
-		camera_up(1.0f);
-		draw_volume();
-	}
-}
-
 int main(int argc, char **argv) {
 
 	if (load_model(FILE_NAME) != 0) {
@@ -192,7 +195,7 @@ int main(int argc, char **argv) {
 	glutDisplayFunc(display_callback);
 	glutKeyboardFunc(keyboard_callback);
 	//glutReshapeFunc(reshape_callback);
-    glutIdleFunc(idle_callback);
+	glutTimerFunc(timer_msecs, timer_callback, 0);
 
 	GLenum err = glewInit();
 	if (GLEW_OK != err) {
@@ -226,6 +229,7 @@ int main(int argc, char **argv) {
 	init_gpu3();
 	init_gpu4();
 	draw_volume();
+	
 	glutMainLoop();
 	return 0;
 }
