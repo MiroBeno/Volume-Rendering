@@ -12,20 +12,21 @@
 #include "texture_types.h"
 #include "texture_fetch_functions.h"
 
-const int BUFFER_SIZE_CUDA = WIN_WIDTH * WIN_HEIGHT * 4;
+extern int BUFFER_SIZE_CUDA;
 
+extern Volume_model volume_model;
 static __constant__ Volume_model volume;
 static __constant__ Ortho_view view;
-static uchar4 *dev_buffer;
+
+extern uchar4 *dev_buffer;
 
 texture<unsigned char, 3, cudaReadModeNormalizedFloat> volume_texture;
 cudaArray *volume_array = 0;
 
-cudaEvent_t start, stop; 
-float elapsedTime;
+extern cudaEvent_t start, stop; 
+extern float elapsedTime;
 
 __device__ float4 sample_color_texture(float3 pos) {
-
 	float sample = tex3D(volume_texture, (pos.x + 1)*0.5f, (pos.y + 1)*0.5f, (pos.z + 1)*0.5f);
 	return volume.transfer_function(sample, pos);
 }
@@ -36,7 +37,7 @@ __global__ void render_ray_gpu3(uchar4 dev_buffer[]) {
 	if ((col >= view.size_px.x) || (row >= view.size_px.y))					// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
 		return;
 
-	float bg = (((col / 16) + (row / 16)) % 2) * 0.3f;
+	float bg = (((col / 16) + (row / 16)) % 2) * 0.15f;
 	float4 bg_color = {bg, bg, bg, 1};
 	float4 color_acc;
 
@@ -71,13 +72,9 @@ __global__ void render_ray_gpu3(uchar4 dev_buffer[]) {
 	dev_buffer[offset].w = 255;
 }
 
-extern void init_gpu3(Volume_model volume_model) {
-
-	cudaMalloc((void **)&dev_buffer, BUFFER_SIZE_CUDA);
+extern void init_gpu3() {
 
 	cudaMemcpyToSymbol(volume, &volume_model, sizeof(Volume_model));
-	cudaEventCreate(&start);
-	cudaEventCreate(&stop);
 
 	cudaExtent volumeDims = {volume_model.dims.x, volume_model.dims.y, volume_model.dims.z};	
 
@@ -88,7 +85,7 @@ extern void init_gpu3(Volume_model volume_model) {
 	copyParams.srcPtr   = make_cudaPitchedPtr(volume_model.data, volumeDims.width*sizeof(unsigned char), volumeDims.width, volumeDims.height);
     copyParams.dstArray = volume_array;
     copyParams.extent   = volumeDims;
-    copyParams.kind     = cudaMemcpyHostToDevice;
+    copyParams.kind     = cudaMemcpyDeviceToDevice;
     cudaMemcpy3D(&copyParams);
 
     volume_texture.normalized = true;                      
@@ -100,12 +97,9 @@ extern void init_gpu3(Volume_model volume_model) {
     cudaBindTextureToArray(volume_texture, volume_array, channelDesc);
 }
 
-extern void free_gpu3(void) {
-	cudaFree(dev_buffer);
+extern void free_gpu3() {
 	cudaUnbindTexture(volume_texture);
 	cudaFreeArray(volume_array);
-	cudaEventDestroy(start);
-	cudaEventDestroy(stop);
 }
 
 extern float render_volume_gpu3(uchar4 *buffer, Ortho_view ortho_view) {

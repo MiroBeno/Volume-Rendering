@@ -6,13 +6,14 @@
 
 #include "cuda_runtime_api.h"
 
-const int BUFFER_SIZE_CUDA = WIN_WIDTH * WIN_HEIGHT * 4;
+int BUFFER_SIZE_CUDA = WIN_WIDTH * WIN_HEIGHT * 4;
 
-static Volume_model volume;
-static uchar4 *dev_buffer;
+Volume_model volume_model;
 
-static cudaEvent_t start, stop; 
-static float elapsedTime;
+uchar4 *dev_buffer;
+
+cudaEvent_t start, stop; 
+float elapsedTime;
 
 __global__ void render_ray_gpu(Volume_model volume, Ortho_view view, uchar4 dev_buffer[]) {
 	int col = blockIdx.x * blockDim.x + threadIdx.x;
@@ -20,7 +21,7 @@ __global__ void render_ray_gpu(Volume_model volume, Ortho_view view, uchar4 dev_
 	if ((col >= view.size_px.x) || (row >= view.size_px.y))					// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
 		return;
 
-	float bg = (((col / 16) + (row / 16)) % 2) * 0.1f;
+	float bg = (((col / 16) + (row / 16)) % 2) * 0.05f;
 	float4 bg_color = {bg, bg, bg, 1};
 	float4 color_acc;
 
@@ -55,20 +56,20 @@ __global__ void render_ray_gpu(Volume_model volume, Ortho_view view, uchar4 dev_
 	dev_buffer[offset].w = 255;
 }
 
-extern void init_gpu(Volume_model volume_model) {
-	volume = volume_model;
+extern void init_gpu(Volume_model volume) {
+	volume_model = volume;
 	unsigned char *dev_volume_data;
-	cudaMalloc((void **)&dev_volume_data, volume.size);
-	cudaMemcpy(dev_volume_data, volume.data, volume.size, cudaMemcpyHostToDevice);
-	volume.data = dev_volume_data;
+	cudaMalloc((void **)&dev_volume_data, volume_model.size);
+	cudaMemcpy(dev_volume_data, volume_model.data, volume_model.size, cudaMemcpyHostToDevice);
+	volume_model.data = dev_volume_data;
 	cudaMalloc((void **)&dev_buffer, BUFFER_SIZE_CUDA);
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
 }
 
-extern void free_gpu(void) {
+extern void free_gpu() {
 	cudaFree(dev_buffer);
-	cudaFree(volume.data);
+	cudaFree(volume_model.data);
 	cudaEventDestroy(start);
 	cudaEventDestroy(stop);
 }
@@ -79,7 +80,7 @@ extern float render_volume_gpu(uchar4 *buffer, Ortho_view ortho_view) {
 	dim3 num_blocks((WIN_WIDTH + threads_dim - 1) / threads_dim, (WIN_HEIGHT + threads_dim - 1) / threads_dim);		// celociselne delenie, 
 																													// ak su rozmery okna nedelitelne 16, spustaju sa bloky	s nevyuzitimi threadmi
 	cudaEventRecord(start, 0);
-	render_ray_gpu<<<num_blocks, threads_per_block>>>(volume, ortho_view, dev_buffer);
+	render_ray_gpu<<<num_blocks, threads_per_block>>>(volume_model, ortho_view, dev_buffer);
 	cudaMemcpy(buffer, dev_buffer, BUFFER_SIZE_CUDA, cudaMemcpyDeviceToHost);
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);
