@@ -2,10 +2,15 @@
 #include "projection.h"
 #include "model.h"
 
+#include <ctime>
+
 static const float4 bg_color = {0.5,0.5,0.5,1};			// opacity backgroundu je 1
 
 static Volume_model volume;
 static View view;
+
+static clock_t startTime;
+static float elapsedTime;
 
 float4 render_ray_cpu(float3 origin, float3 direction) {
 	float2 k_range = volume.intersect(origin, direction);
@@ -32,9 +37,10 @@ extern void init_cpu(Volume_model volume_model) {
 	volume = volume_model;
 }
 
-extern void render_volume_cpu(unsigned char *buffer, View current_view) {
+extern float render_volume_cpu(unsigned char *buffer, View current_view) {
 	view = current_view;
 	float3 origin = {0,0,0}, direction = {0,0,0};
+	startTime = clock();
 	for(int row = 0; row < WIN_HEIGHT; row++)
 		for(int col = 0; col < WIN_WIDTH; col++)
 		{	
@@ -45,6 +51,8 @@ extern void render_volume_cpu(unsigned char *buffer, View current_view) {
 			*buffer++ = (unsigned char) map_float_int(color.z,256);
 			*buffer++ = 255;
 		}
+	elapsedTime = (clock() - startTime) / (CLOCKS_PER_SEC / 1000.0f);
+	return elapsedTime;
 }
 
 

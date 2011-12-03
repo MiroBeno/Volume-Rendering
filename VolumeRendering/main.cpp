@@ -41,7 +41,7 @@ extern float render_volume_gpu4(uchar4 *buffer, View current_view);
 extern void init_gpu4();
 extern void free_gpu4();
 
-extern void render_volume_cpu(unsigned char *buffer, View current_view);
+extern float render_volume_cpu(unsigned char *buffer, View current_view);
 extern void init_cpu(Volume_model volume_model);
 
 uchar4 *prepare_PBO() {							//GLubyte *
@@ -72,7 +72,7 @@ void draw_volume() {
 	uchar4 *pbo_array = prepare_PBO();
 	switch (renderer_id) {
 		case 1:
-			render_volume_cpu((unsigned char *)pbo_array, get_view());
+			elapsedTime = render_volume_cpu((unsigned char *)pbo_array, get_view());
 			sprintf(appendString, "CPU @ %3.4f ms", elapsedTime);
 			break;
 		case 2 :
