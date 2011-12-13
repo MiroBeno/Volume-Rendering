@@ -198,7 +198,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\Raycaster.cpp"
+				RelativePath=".\raycaster.cpp"
 				>
 			</File>
 			<File
@@ -240,7 +240,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\Raycaster.h"
+				RelativePath=".\raycaster.h"
 				>
 			</File>
 		</Filter>

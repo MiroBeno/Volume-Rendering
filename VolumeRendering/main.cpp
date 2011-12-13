@@ -8,14 +8,15 @@
 
 #include "model.h"
 #include "projection.h"
+#include "raycaster.h"
 
 #include "cuda_runtime_api.h"
 #include "cuda_gl_interop.h"
 
 const int timer_msecs = 1;
 const GLsizeiptr DATA_SIZE = WIN_WIDTH * WIN_HEIGHT * 4;	// int CHANNEL_COUNT = 4;
-//const char *FILE_NAME = "Bucky.raw";						// 32x32x32 x 8bit
-const char *FILE_NAME = "Foot.raw";						// 256x256x256 x 8bit
+const char *FILE_NAME = "Bucky.raw";						// 32x32x32 x 8bit
+//const char *FILE_NAME = "Foot.raw";						// 256x256x256 x 8bit
 //const char *FILE_NAME = "VisMale.raw";					// 128x256x256 x 8bit
 //const char *FILE_NAME = "XMasTree.raw";					// 512x499x512 x 8bit
 
@@ -28,22 +29,22 @@ static cudaGraphicsResource *pbo_cuda_id;
 static int renderer_id = 2;
 static bool auto_rotate = true;
 
-extern float render_volume_gpu(uchar4 *buffer, View current_view);
+extern float render_volume_gpu(uchar4 *buffer, View current_view, Raycaster current_raycaster);
 extern void init_gpu(Volume_model volume);
 extern void free_gpu();
 
-extern float render_volume_gpu2(uchar4 *buffer, View current_view);
+extern float render_volume_gpu2(uchar4 *buffer, View current_view, Raycaster current_raycaster);
 extern void init_gpu2();
 
-extern float render_volume_gpu3(uchar4 *buffer, View current_view);
+extern float render_volume_gpu3(uchar4 *buffer, View current_view, Raycaster current_raycaster);
 extern void init_gpu3();
 extern void free_gpu3();
 
-extern float render_volume_gpu4(uchar4 *buffer, View current_view);
+extern float render_volume_gpu4(uchar4 *buffer, View current_view, Raycaster current_raycaster);
 extern void init_gpu4();
 extern void free_gpu4();
 
-extern float render_volume_cpu(unsigned char *buffer, View current_view);
+extern float render_volume_cpu(unsigned char *buffer, View current_view, Raycaster current_raycaster);
 extern void init_cpu(Volume_model volume_model);
 
 uchar4 *prepare_PBO() {							//GLubyte *
@@ -69,28 +70,28 @@ void finalize_PBO() {
 void draw_volume() {
 	update_view(WIN_WIDTH, WIN_HEIGHT, VIRTUAL_VIEW_SIZE);
 	float elapsedTime = 0;
-	char titleString[256] = "Naive Volume Rendering. ";
+	char titleString[256] = "Naive VR. ";
 	char appendString[256] = "";
 	uchar4 *pbo_array = prepare_PBO();
 	switch (renderer_id) {
 		case 1:
-			elapsedTime = render_volume_cpu((unsigned char *)pbo_array, get_view());
+			elapsedTime = render_volume_cpu((unsigned char *)pbo_array, get_view(), get_raycaster());
 			sprintf(appendString, "CPU @ %3.4f ms", elapsedTime);
 			break;
 		case 2 :
-			elapsedTime = render_volume_gpu(pbo_array, get_view());
+			elapsedTime = render_volume_gpu(pbo_array, get_view(), get_raycaster());
 			sprintf(appendString, "Standard CUDA @ %3.4f ms", elapsedTime);
 			break;
 		case 3 :
-			elapsedTime = render_volume_gpu2(pbo_array, get_view());
+			elapsedTime = render_volume_gpu2(pbo_array, get_view(), get_raycaster());
 			sprintf(appendString, "Constant Memory @ %3.4f ms", elapsedTime);
 			break;
 		case 4 :
-			elapsedTime = render_volume_gpu3(pbo_array, get_view());
+			elapsedTime = render_volume_gpu3(pbo_array, get_view(), get_raycaster());
 			sprintf(appendString, "CM + 3D Texture Memory @ %3.4f ms", elapsedTime);
 			break;
 		case 5 :
-			elapsedTime = render_volume_gpu4(pbo_array, get_view());
+			elapsedTime = render_volume_gpu4(pbo_array, get_view(), get_raycaster());
 			sprintf(appendString, "CM + 3D Texture Memory + GL interop @ %3.4f ms", elapsedTime);
 			break;
 	}
@@ -149,7 +150,7 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		auto_rotate = !auto_rotate;
 		glutTimerFunc(timer_msecs, timer_callback, 0);
 	}
-	if (strchr("wsadqe1234567890", key)) {
+	if (strchr("wsadqe1234567890opklnm", key)) {
 		switch (key) {
 			case 'w': camera_up(5.0f); break;
 			case 's': camera_down(5.0f); break;
@@ -157,6 +158,12 @@ void keyboard_callback(unsigned char key, int x, int y) {
 			case 'd': camera_right(5.0f); break;
 			case 'q': camera_zoom_in(0.1f); break;
 			case 'e': camera_zoom_out(0.1f); break;
+			case 'o': set_ray_step(0.01f); break;
+			case 'p': set_ray_step(-0.01f); break;
+			case 'k': set_tf_offset(0.025f); break;
+			case 'l': set_tf_offset(-0.025f); break;
+			case 'n': set_ray_threshold(0.05f); break;
+			case 'm': set_ray_threshold(-0.05f); break;
 			case '1': renderer_id = 1; break;
 			case '2': renderer_id = 2; break;
 			case '3': renderer_id = 3; break;
@@ -193,7 +200,7 @@ int main(int argc, char **argv) {
 	glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);		//GLUT_DOUBLE (+ glutSwapBuffers().  Rozdiely? Pomalsie pri dobule znacne, aj ked sa meria iba cas kernelu!)
 	glutInitWindowSize(WIN_WIDTH, WIN_HEIGHT);
 	glutInitWindowPosition(100,1);
-	window_id = glutCreateWindow("Naive Volume Rendering");
+	window_id = glutCreateWindow("Naive VR.");
 	glutDisplayFunc(display_callback);
 	glutKeyboardFunc(keyboard_callback);
 	//glutReshapeFunc(reshape_callback);
@@ -205,7 +212,7 @@ int main(int argc, char **argv) {
 		glutDestroyWindow(window_id);
 		exit(1);
 	}
-	printf("Using GLEW %s\n", glewGetString(GLEW_VERSION));
+	printf("Using GLEW %s\n\n", glewGetString(GLEW_VERSION));
 	if (!GLEW_VERSION_2_0) {
 		printf("Error: OpenGL 2.0 is not supported.\n");
 		glutDestroyWindow(window_id);
@@ -224,6 +231,15 @@ int main(int argc, char **argv) {
 	glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, DATA_SIZE, NULL, GL_DYNAMIC_DRAW_ARB);
 
 	cudaGraphicsGLRegisterBuffer(&pbo_cuda_id, pbo_gl_id, cudaGraphicsMapFlagsWriteDiscard);
+
+	printf("Use '12345' to change renderer\n    'wasd' and '7890' to manipulate camera position\n");
+	printf("    'op' to change ray sampling rate\n    'kl' to change transfer function offset\n");
+	printf("    'nm' to change ray accumulation threshold\n    'r' to toggle autorotation\n\n");
+
+	int max_size = MAXIMUM(get_model().dims.x, MAXIMUM(get_model().dims.y, get_model().dims.z));	// dlzka najvacsej hrany je 2 a stred kvadra v [0,0,0]
+	float ray_step = 2.0f / max_size;
+	ray_step -= ray_step / max_size;
+	set_ray_step(ray_step - 0.06f);
 
 	init_cpu(get_model());
 	init_gpu(get_model());

@@ -3,8 +3,8 @@
 
 #include "data_utils.h"
 
-#define WIN_WIDTH 1024
-#define WIN_HEIGHT 1024
+#define WIN_WIDTH 512
+#define WIN_HEIGHT 512
 #define VIRTUAL_VIEW_SIZE 3.0f
 
 struct View {

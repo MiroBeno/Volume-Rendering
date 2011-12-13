@@ -8,12 +8,12 @@ static float cam_distance = 2;
 static float3 cam_position = {2, 0, 0};
 
 static View view = {	{WIN_WIDTH, WIN_HEIGHT}, 
-							{WIN_WIDTH / 2, WIN_HEIGHT / 2}, 
-							{2, 0, 0},
-							{-1, 0, 0},
-							make_float3(0, 0, -1) * (VIRTUAL_VIEW_SIZE / MINIMUM(WIN_WIDTH, WIN_HEIGHT)),
-							make_float3(0, 1, 0) * (VIRTUAL_VIEW_SIZE / MINIMUM(WIN_WIDTH, WIN_HEIGHT)),
-						 };
+						{WIN_WIDTH / 2, WIN_HEIGHT / 2}, 
+						{2, 0, 0},
+						{-1, 0, 0},
+						make_float3(0, 0, -1) * (VIRTUAL_VIEW_SIZE / MINIMUM(WIN_WIDTH, WIN_HEIGHT)),
+						make_float3(0, 1, 0) * (VIRTUAL_VIEW_SIZE / MINIMUM(WIN_WIDTH, WIN_HEIGHT)),
+					 };
 
 float3 compute_camera_position() {
 	float tmp = cam_distance * cos(cam_angles.y);

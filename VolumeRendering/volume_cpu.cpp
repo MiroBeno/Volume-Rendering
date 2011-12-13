@@ -1,6 +1,7 @@
 #include "data_utils.h"
 #include "projection.h"
 #include "model.h"
+#include "raycaster.h"
 
 #include <ctime>
 
@@ -8,25 +9,26 @@ static const float4 bg_color = {0.5,0.5,0.5,1};			// opacity backgroundu je 1
 
 static Volume_model volume;
 static View view;
+static Raycaster raycaster;
 
 static clock_t startTime;
 static float elapsedTime;
 
 float4 render_ray_cpu(float3 origin, float3 direction) {
-	float2 k_range = volume.intersect(origin, direction);
+	float2 k_range = raycaster.intersect(origin, direction);
 	if ((k_range.x > k_range.y) || (k_range.y < 0))				// prazdny interval koeficientu k = nie je presecnik ALEBO vystupny priesecnik je za bodom vzniku luca
 		return bg_color;
 	if ((k_range.x < 0))										// bod vzniku luca je vnutri kocky, zaciname nie vstupnym priesecnikom, ale bodom vzniku
 		k_range.x = 0;
 	float4 color_acc = {0,0,0,0};
-	for (float k = k_range.x; k <= k_range.y; k += volume.ray_step) {		
+	for (float k = k_range.x; k <= k_range.y; k += raycaster.ray_step) {		
 		float3 pt = origin + (direction * k);
-		float4 color_cur = volume.sample_color(pt);
+		float4 color_cur = raycaster.sample_color(pt);
 		color_cur.x *= color_cur.w;								// transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
 		color_cur.y *= color_cur.w;
 		color_cur.z *= color_cur.w;
 		color_acc = color_acc + (color_cur * (1 - color_acc.w));
-		if (color_acc.w > 0.95f) 
+		if (color_acc.w > raycaster.ray_thershold) 
 			break;
 	}
 	color_acc = color_acc + (bg_color * (1 - color_acc.w));	
@@ -37,8 +39,10 @@ extern void init_cpu(Volume_model volume_model) {
 	volume = volume_model;
 }
 
-extern float render_volume_cpu(unsigned char *buffer, View current_view) {
+extern float render_volume_cpu(unsigned char *buffer, View current_view, Raycaster current_raycaster) {
 	view = current_view;
+	raycaster = current_raycaster;
+	raycaster.model = volume;
 	float3 origin = {0,0,0}, direction = {0,0,0};
 	startTime = clock();
 	for(int row = 0; row < WIN_HEIGHT; row++)
@@ -97,11 +101,11 @@ float4 render_ray_alt(float3 origin, float3 direction) {
 	if ((k_range.x < 0))										
 		k_range.x = 0;
 	color_acc.x = 0; color_acc.y = 0; color_acc.z = 0; color_acc.w = 0;
-	for (k = k_range.x; k <= k_range.y; k += volume.ray_step) {		
+	for (k = k_range.x; k <= k_range.y; k += raycaster.ray_step) {		
 		pnt.x = origin.x + direction.x * k;
 		pnt.y = origin.y + direction.y * k;
 		pnt.z = origin.z + direction.z * k;
-		color_cur = volume.sample_color(pnt);
+		color_cur = raycaster.sample_color(pnt);
 		color_cur.x *= color_cur.w;								
 		color_cur.y *= color_cur.w;
 		color_cur.z *= color_cur.w;
@@ -109,7 +113,7 @@ float4 render_ray_alt(float3 origin, float3 direction) {
 		color_acc.y += color_cur.y * (1-color_acc.w);
 		color_acc.z += color_cur.z * (1-color_acc.w);
 		color_acc.w += color_cur.w * (1-color_acc.w);
-		if (color_acc.w > 0.95f) 
+		if (color_acc.w > raycaster.ray_thershold) 
 			break;
 	}
 	color_acc.x += bg_color.x * (1-color_acc.w);
