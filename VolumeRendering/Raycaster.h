@@ -2,28 +2,14 @@
 #define _MODEL_H_
 
 #include "data_utils.h"
+#include "model.h"
 
-//const float POS_INF = FLT_MAX, NEG_INF = FLT_MIN;
-//CUDART_MAX_NORMAL_F, CUDART_MIN_NORMAL_F
-#define POS_INF 10000
-#define NEG_INF -10000
+struct Raycaster {
+	Volume_model model;
+	float ray_step;
+	float ray_thershold;
+	float ray_offset;
 
-struct Volume_model {
-	unsigned char *data;
-	unsigned int size;
-	int3 dims;		
-	float3 min_bound;
-	float3 max_bound;
-	float ray_step;	
-
-	__host__ __device__ float sample_data(float3 pos) {
-		unsigned char sample = data[
-			map_float_int((pos.z + 1)*0.5f, dims.z) * dims.x * dims.y +
-			map_float_int((pos.y + 1)*0.5f, dims.y) * dims.x +
-			map_float_int((pos.x + 1)*0.5f, dims.x)
-		];
-		return (sample / 255.0f); 
-	}
 
 	__host__ __device__ float4 transfer_function(float sample, float3 pos) {
 		float4 intensity = {sample, sample, sample, sample};		// > 0.1f ? sample : 0
@@ -65,9 +51,5 @@ struct Volume_model {
 	}
 
 };
-
-int load_model(const char* file_name);
-
-Volume_model get_model();
 
 #endif

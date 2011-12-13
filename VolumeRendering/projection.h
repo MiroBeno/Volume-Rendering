@@ -5,7 +5,7 @@
 
 #define WIN_WIDTH 1024
 #define WIN_HEIGHT 1024
-#define VIRTUAL_VIEW_SIZE 3.5f
+#define VIRTUAL_VIEW_SIZE 3.0f
 
 struct View {
 	int2 size_px;

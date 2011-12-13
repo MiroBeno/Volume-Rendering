@@ -36,12 +36,15 @@ int load_model(const char* file_name) {
 	if (volume.size == 0 || result != 0) 
 		return -1;
 	printf("File loaded: %s. Size: %u B.\n", file_name, volume.size);
-	volume.dims = make_int3(32, 32, 32);											// nacita sa z hlavicky/dat suboru, zatial explicitne
+//	volume.dims = make_int3(32, 32, 32);
+	volume.dims = make_int3(256, 256, 256);
+//	volume.dims = make_int3(128, 256, 256);
+//	volume.dims = make_int3(512, 499, 512);
 	int max_size = MAXIMUM(volume.dims.x, MAXIMUM(volume.dims.y, volume.dims.z));	// dlzka najvacsej hrany je 2 a stred kvadra v [0,0,0]
 	volume.ray_step = 2.0f / max_size;
 	volume.ray_step -= volume.ray_step / max_size;
-	volume.max_bound = make_float3(volume.dims.x / (float) max_size, volume.dims.y / (float) max_size, volume.dims.z / (float) max_size);
-	volume.min_bound = -volume.max_bound;
+//	volume.max_bound = make_float3(volume.dims.x / (float) max_size, volume.dims.y / (float) max_size, volume.dims.z / (float) max_size);
+//	volume.min_bound = -volume.max_bound;
 	return 0;
 }
 

@@ -14,8 +14,10 @@
 
 const int timer_msecs = 1;
 const GLsizeiptr DATA_SIZE = WIN_WIDTH * WIN_HEIGHT * 4;	// int CHANNEL_COUNT = 4;
-const char *FILE_NAME = "Bucky.raw";						// 32x32x32  x unsigned char
-//const char *FILE_NAME = "nucleon.raw";					// 41x41x41  x unsigned char
+//const char *FILE_NAME = "Bucky.raw";						// 32x32x32 x 8bit
+const char *FILE_NAME = "Foot.raw";						// 256x256x256 x 8bit
+//const char *FILE_NAME = "VisMale.raw";					// 128x256x256 x 8bit
+//const char *FILE_NAME = "XMasTree.raw";					// 512x499x512 x 8bit
 
 static int window_id;
 static GLuint pbo_gl_id;

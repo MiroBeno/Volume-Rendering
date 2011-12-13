@@ -198,6 +198,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\Raycaster.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\volume_cpu.cpp"
 				>
 			</File>
@@ -233,6 +237,10 @@
 			</File>
 			<File
 				RelativePath=".\projection.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Raycaster.h"
 				>
 			</File>
 		</Filter>

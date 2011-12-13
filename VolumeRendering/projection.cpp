@@ -4,7 +4,7 @@
 const float2 distance_limits = {10, 0.1f};
 
 static float2 cam_angles = {0,0};			// x - horizontalny uhol, y - vertikalny uhol
-static float cam_distance = 2; 
+static float cam_distance = 2;
 static float3 cam_position = {2, 0, 0};
 
 static View view = {	{WIN_WIDTH, WIN_HEIGHT}, 

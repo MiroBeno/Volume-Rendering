@@ -33,3 +33,14 @@ upozornit na lightweight thready, rozdiel oproti tradicnym CPU threadom (rezia,.
 
 dopisat kratucky opis prikladu na Obr.5
 doplnit memory model, vymenit obrazok g100-2.jpg (texture memory ...!)
+
+slovnik pojmov!
+
+Kvalita – èas.
+Alternatívnou monosou je adaptívna zmena parametrov pre dosiahnutie potrebnej odozvy za cenu nišej kvality zobrazenia.
+
+gliffy:
+zlvskwuu@sharklasers.com
+blabla
+
+Tieto toti majú za sebou pomerne dlhı vıvoj, aj èo sa tıka ich paralelizácie, a perspektíva nejakého väèšieho prínosu na rozsahu diplomového projektu sa nezdala by ve¾mi pravdepodobná.  
