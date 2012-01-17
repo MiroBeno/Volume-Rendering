@@ -15,9 +15,9 @@
 
 const int timer_msecs = 1;
 const GLsizeiptr DATA_SIZE = WIN_WIDTH * WIN_HEIGHT * 4;	// int CHANNEL_COUNT = 4;
-const char *FILE_NAME = "Bucky.raw";						// 32x32x32 x 8bit
+//const char *FILE_NAME = "Bucky.raw";						// 32x32x32 x 8bit
 //const char *FILE_NAME = "Foot.raw";						// 256x256x256 x 8bit
-//const char *FILE_NAME = "VisMale.raw";					// 128x256x256 x 8bit
+const char *FILE_NAME = "VisMale.raw";					// 128x256x256 x 8bit
 //const char *FILE_NAME = "XMasTree.raw";					// 512x499x512 x 8bit
 
 static int window_id;
@@ -34,7 +34,6 @@ extern void init_gpu(Volume_model volume);
 extern void free_gpu();
 
 extern float render_volume_gpu2(uchar4 *buffer, View current_view, Raycaster current_raycaster);
-extern void init_gpu2();
 
 extern float render_volume_gpu3(uchar4 *buffer, View current_view, Raycaster current_raycaster);
 extern void init_gpu3();
@@ -243,11 +242,10 @@ int main(int argc, char **argv) {
 
 	init_cpu(get_model());
 	init_gpu(get_model());
-	init_gpu2();
 	init_gpu3();
 	init_gpu4();
 	draw_volume();
-	
+
 	glutMainLoop();
 	return 0;
 }

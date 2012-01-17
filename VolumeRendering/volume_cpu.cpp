@@ -18,16 +18,11 @@ float4 render_ray_cpu(float3 origin, float3 direction) {
 	float2 k_range = raycaster.intersect(origin, direction);
 	if ((k_range.x > k_range.y) || (k_range.y < 0))				// prazdny interval koeficientu k = nie je presecnik ALEBO vystupny priesecnik je za bodom vzniku luca
 		return bg_color;
-	if ((k_range.x < 0))										// bod vzniku luca je vnutri kocky, zaciname nie vstupnym priesecnikom, ale bodom vzniku
-		k_range.x = 0;
 	float4 color_acc = {0,0,0,0};
 	for (float k = k_range.x; k <= k_range.y; k += raycaster.ray_step) {		
 		float3 pt = origin + (direction * k);
 		float4 color_cur = raycaster.sample_color(pt);
-		color_cur.x *= color_cur.w;								// transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
-		color_cur.y *= color_cur.w;
-		color_cur.z *= color_cur.w;
-		color_acc = color_acc + (color_cur * (1 - color_acc.w));
+		color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
 		if (color_acc.w > raycaster.ray_thershold) 
 			break;
 	}
@@ -58,7 +53,6 @@ extern float render_volume_cpu(unsigned char *buffer, View current_view, Raycast
 	elapsedTime = (clock() - startTime) / (CLOCKS_PER_SEC / 1000.0f);
 	return elapsedTime;
 }
-
 
 //////////////////
 //OLD CODE
@@ -106,9 +100,6 @@ float4 render_ray_alt(float3 origin, float3 direction) {
 		pnt.y = origin.y + direction.y * k;
 		pnt.z = origin.z + direction.z * k;
 		color_cur = raycaster.sample_color(pnt);
-		color_cur.x *= color_cur.w;								
-		color_cur.y *= color_cur.w;
-		color_cur.z *= color_cur.w;
 		color_acc.x += color_cur.x * (1-color_acc.w);
 		color_acc.y += color_cur.y * (1-color_acc.w);
 		color_acc.z += color_cur.z * (1-color_acc.w);

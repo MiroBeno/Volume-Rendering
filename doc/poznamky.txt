@@ -44,3 +44,9 @@ zlvskwuu@sharklasers.com
 blabla
 
 Tieto toti majú za sebou pomerne dlhı vıvoj, aj èo sa tıka ich paralelizácie, a perspektíva nejakého väèšieho prínosu na rozsahu diplomového projektu sa nezdala by ve¾mi pravdepodobná.  
+
+
+kod:
+pozriet simpleGL sample
+doplnit referenciu na nVidia copyright pre util kniznicu cutil_math
+pozriet memCpy ci netreba typovat na void

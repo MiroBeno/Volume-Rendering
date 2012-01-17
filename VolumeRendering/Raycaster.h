@@ -18,7 +18,11 @@ struct Raycaster {
 	__host__ __device__ float4 transfer_function(float sample, float3 pos) {
 		float4 intensity = {sample, sample, sample, sample >= tf_offset ? sample : 0};
 		float4 color = {(pos.x+1)*0.5f, (pos.y+1)*0.5f, (pos.z+1)*0.5f, 1};
-		return intensity * color;	
+		color = color * intensity;
+		color.x *= color.w;				// aplikovanie optickeho modelu pre kompoziciu (farba * alfa)
+		color.y *= color.w;
+		color.z *= color.w;
+		return color;
 	}
 
 	__host__ __device__ float4 sample_color(float3 pos) {
@@ -50,9 +54,9 @@ struct Raycaster {
 		if (yRange.x > k1) k1 = yRange.x;
 		if (zRange.x > k1) k1 = zRange.x;
 		if (yRange.y < k2) k2 = yRange.y;
-		if (zRange.y < k2) k2 = zRange.y;
-		return make_float2(k1, k2);					// pri vypocte k mozu vzniknut artefakty, a hodnoty mozu byt mimo volume, mozno riesit k +-= 0.00001f; alebo clampovanim vysledku na stenu
-	}
+		if (zRange.y < k2) k2 = zRange.y;					
+		return make_float2(k1 > 0 ? k1 : 0, k2);	// ak x < 0 bod vzniku luca je vnutri kocky - zacneme nie vstupnym priesecnikom, ale bodom vzniku (k = 0)
+	}												// pri vypocte k mozu vzniknut artefakty, a hodnoty mozu byt mimo volume, mozno riesit k +-= 0.00001f; alebo clampovanim vysledku na stenu
 
 };
 
