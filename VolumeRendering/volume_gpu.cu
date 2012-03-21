@@ -7,11 +7,11 @@
 
 #include "cuda_runtime_api.h"
 
-int BUFFER_SIZE_CUDA = WIN_WIDTH * WIN_HEIGHT * 4;
 dim3 THREADS_PER_BLOCK(16, 16);				// pocet threadov v bloku - podla occupancy calculator
 
 unsigned char *dev_volume_data;
 uchar4 *dev_buffer;
+int dev_buffer_size = WIN_WIDTH * WIN_HEIGHT * 4;
 cudaEvent_t start, stop; 
 float elapsedTime;
 
@@ -41,7 +41,7 @@ __global__ void render_ray_gpu(Raycaster raycaster, uchar4 dev_buffer[]) {
 extern void init_gpu(Volume_model volume) {
 	cudaMalloc((void **)&dev_volume_data, volume.size);
 	cudaMemcpy(dev_volume_data, volume.data, volume.size, cudaMemcpyHostToDevice);
-	cudaMalloc((void **)&dev_buffer, BUFFER_SIZE_CUDA);
+	cudaMalloc((void **)&dev_buffer, dev_buffer_size);
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
 }
@@ -53,6 +53,12 @@ extern void free_gpu() {
 	cudaEventDestroy(stop);
 }
 
+extern void reset_gpu_buffer(int buffer_size) {
+	cudaFree(dev_buffer);
+	dev_buffer_size = buffer_size;
+	cudaMalloc((void **)&dev_buffer, dev_buffer_size);
+}
+
 extern float render_volume_gpu(uchar4 *buffer, Raycaster current_raycaster) {
 	current_raycaster.model.data = dev_volume_data;
 	dim3 num_blocks((current_raycaster.view.size_px.x + THREADS_PER_BLOCK.x - 1) / THREADS_PER_BLOCK.x, 
@@ -60,7 +66,7 @@ extern float render_volume_gpu(uchar4 *buffer, Raycaster current_raycaster) {
 			// celociselne delenie, ak su rozmery okna nedelitelne 16, spustaju sa bloky s nevyuzitimi threadmi
 	cudaEventRecord(start, 0);
 	render_ray_gpu<<<num_blocks, THREADS_PER_BLOCK>>>(current_raycaster, dev_buffer);
-	cudaMemcpy(buffer, dev_buffer, BUFFER_SIZE_CUDA, cudaMemcpyDeviceToHost);
+	cudaMemcpy(buffer, dev_buffer, dev_buffer_size, cudaMemcpyDeviceToHost);
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&elapsedTime, start, stop);

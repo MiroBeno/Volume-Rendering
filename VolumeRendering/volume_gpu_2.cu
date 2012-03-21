@@ -7,13 +7,13 @@
 
 #include "cuda_runtime_api.h"
 
-extern int BUFFER_SIZE_CUDA;
 extern dim3 THREADS_PER_BLOCK;
 
 static __constant__ Raycaster raycaster;
 
 extern unsigned char *dev_volume_data;
 extern uchar4 *dev_buffer;
+extern int dev_buffer_size;
 extern cudaEvent_t start, stop; 
 extern float elapsedTime;
 
@@ -48,7 +48,7 @@ extern float render_volume_gpu2(uchar4 *buffer, Raycaster current_raycaster) {
 	cudaEventRecord(start, 0);
 	cudaMemcpyToSymbol(raycaster, &current_raycaster, sizeof(Raycaster));
 	render_ray_gpu2<<<num_blocks, THREADS_PER_BLOCK>>>(dev_buffer);
-	cudaMemcpy(buffer, dev_buffer, BUFFER_SIZE_CUDA, cudaMemcpyDeviceToHost);
+	cudaMemcpy(buffer, dev_buffer, dev_buffer_size, cudaMemcpyDeviceToHost);
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&elapsedTime, start, stop);

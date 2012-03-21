@@ -13,7 +13,6 @@
 #include "texture_types.h"
 #include "texture_fetch_functions.h"
 
-extern int BUFFER_SIZE_CUDA;
 extern dim3 THREADS_PER_BLOCK;
 
 static __constant__ Raycaster raycaster;

@@ -38,6 +38,7 @@ float3 camera_right(int pixels);
 float3 camera_zoom(int pixels);
 float3 set_camera_position(float distance, float vert_angle, float horiz_angle);
 void toggle_perspective();
+void set_window_size(int2 px);
 
 View get_view();
 

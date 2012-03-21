@@ -19,11 +19,7 @@ static View view = {	{WIN_WIDTH, WIN_HEIGHT},
 						false
 					 };
 
-void update_view() {
-	//view.size_px.x = width_px; 
-	//view.size_px.y = height_px;
-	//view.half_px.x = width_px / 2; 
-	//view.half_px.y = height_px / 2;	
+void update_view() {	
 	view.origin = cam_position;					
 	view.direction = vector_normalize(-view.origin);				// pozicia kamery je uprostred viewu (pozicia kamery), smerujeme vzdy do [0,0,0] staci vynasobit -1 (= 0 - center)
 
@@ -103,6 +99,14 @@ void toggle_perspective() {
 	else
 		virtual_view_size = 3.0f;
 	printf("Perspective: %s\n", view.perspective_ray ? "on" : "off");
+	update_view();
+}
+
+void set_window_size(int2 px) {
+	view.size_px = px; 
+	view.half_px.x = px.x / 2; 
+	view.half_px.y = px.y / 2;
+	cam_pixel_delta = 180.0f / (MINIMUM(px.x, px.y));
 	update_view();
 }
 
