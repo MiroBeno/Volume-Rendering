@@ -5,7 +5,6 @@
 
 #define WIN_WIDTH 1024
 #define WIN_HEIGHT 1024
-#define VIRTUAL_VIEW_SIZE 3.0f
 
 struct View {
 	int2 size_px;
@@ -14,30 +13,32 @@ struct View {
 	float3 direction;  
 	float3 right_plane;
 	float3 up_plane; 
+	bool perspective_ray;
 
-	__host__ __device__ void get_ortho_ray(int col, int row, float3 *origin_vector, float3 *direction_vector) {
-		*direction_vector = direction;
-		*origin_vector = origin + (right_plane * (float) (col - half_px.x));
-		*origin_vector = *origin_vector + (up_plane * (float) (row - half_px.y));
-	}
-
-	__host__ __device__ void get_perspective_ray(int col, int row, float3 *origin_vector, float3 *direction_vector) {
-		*origin_vector = origin;
-		*direction_vector = origin * 0.6f + (right_plane * (float) (col - half_px.x));
-		*direction_vector = *direction_vector + (up_plane * (float) (row - half_px.y));
-		*direction_vector = vector_normalize(*direction_vector + (-*origin_vector));
+	__host__ __device__ void get_ray(int2 pos, float3 *origin_vector, float3 *direction_vector) {
+		if (perspective_ray) {
+			*origin_vector = origin;
+			*direction_vector = origin * 0.6f + (right_plane * (float) (pos.x - half_px.x));
+			*direction_vector = *direction_vector + (up_plane * (float) (pos.y - half_px.y));
+			*direction_vector = vector_normalize(*direction_vector + (-*origin_vector));
+		}
+		else {
+			*direction_vector = direction;
+			*origin_vector = origin + (right_plane * (float) (pos.x - half_px.x));
+			*origin_vector = *origin_vector + (up_plane * (float) (pos.y - half_px.y));
+		}
 	}
 };
 
-float3 camera_up(float angle);
 float3 camera_down(float angle);
-float3 camera_left(float angle);
 float3 camera_right(float angle);
-float3 camera_zoom_in(float distance);
-float3 camera_zoom_out(float distance);
-float3 set_camera_position_deg(float distance, float vert_angle, float horiz_angle);
+float3 camera_zoom(float distance);
+float3 camera_down(int pixels);
+float3 camera_right(int pixels);
+float3 camera_zoom(int pixels);
+float3 set_camera_position(float distance, float vert_angle, float horiz_angle);
+void toggle_perspective();
 
-void update_view(int width_px, int height_px, float size);
 View get_view();
 
 #endif

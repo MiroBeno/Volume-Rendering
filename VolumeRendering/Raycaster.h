@@ -3,6 +3,7 @@
 
 #include "data_utils.h"
 #include "model.h"
+#include "projection.h"
 
 //const float POS_INF = FLT_MAX, NEG_INF = FLT_MIN;
 //CUDART_MAX_NORMAL_F, CUDART_MIN_NORMAL_F
@@ -11,9 +12,11 @@
 
 struct Raycaster {
 	Volume_model model;
+	View view;
 	float ray_step;
-	float ray_thershold;
+	float ray_threshold;
 	float tf_offset;
+	float3 bg_color;
 
 	__host__ __device__ float4 transfer_function(float sample, float3 pos) {
 		float4 intensity = {sample, sample, sample, sample >= tf_offset ? sample : 0};
@@ -43,7 +46,7 @@ struct Raycaster {
 		}
 		float k1 = (min_bound - pt) / dir;
 		float k2 = (max_bound - pt) / dir;
-		return k1 <= k2 ? make_float2(k1, k2) : make_float2(k2, k1); // skontroluj opacny vektor
+		return (k1 <= k2) ? make_float2(k1, k2) : make_float2(k2, k1); // skontroluj opacny vektor
 	}
 
 	__host__ __device__ float2 intersect(float3 pt, float3 dir) {
@@ -58,13 +61,22 @@ struct Raycaster {
 		return make_float2(k1 > 0 ? k1 : 0, k2);	// ak x < 0 bod vzniku luca je vnutri kocky - zacneme nie vstupnym priesecnikom, ale bodom vzniku (k = 0)
 	}												// pri vypocte k mozu vzniknut artefakty, a hodnoty mozu byt mimo volume, mozno riesit k +-= 0.00001f; alebo clampovanim vysledku na stenu
 
+	__host__ __device__ void write_color(float4 color, int2 pos, uchar4 buffer[]) {
+		int offset = (pos.y * view.size_px.x + pos.x);
+		buffer[offset].x = map_float_int(color.x,256);
+		buffer[offset].y = map_float_int(color.y,256);
+		buffer[offset].z = map_float_int(color.z,256);
+		buffer[offset].w = 255;
+	}
+
 };
 
-void set_tf_offset(float offset);
-void set_ray_step(float step);
-void set_ray_threshold(float threshold);
+void change_tf_offset(float offset, bool reset);
+void change_ray_step(float step, bool reset);
+void change_ray_threshold(float threshold, bool reset);
 
 void set_raycaster_model(Volume_model model);
+void set_raycaster_view(View view);
 
 Raycaster get_raycaster();
 

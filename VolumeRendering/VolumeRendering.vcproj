@@ -253,6 +253,18 @@
 				RelativePath=".\Bucky.raw"
 				>
 			</File>
+			<File
+				RelativePath=".\Foot.raw"
+				>
+			</File>
+			<File
+				RelativePath=".\VisMale.raw"
+				>
+			</File>
+			<File
+				RelativePath=".\XMasTree.raw"
+				>
+			</File>
 		</Filter>
 	</Files>
 	<Globals>

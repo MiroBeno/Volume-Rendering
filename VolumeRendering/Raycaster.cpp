@@ -2,35 +2,40 @@
 #include <stdlib.h>
 #include "raycaster.h"
 
-static Raycaster raycaster = {	NULL,				// opravit inicializaciu, asi sa neda pri vnorenej strukture
-								0,
-								{0, 0, 0},
-								{-1, -1, -1},
-								{1, 1, 1},
+static Raycaster raycaster = {	Volume_model(),
+								View(),
 								0.06f,
 								0.95f,
-								0.0f
+								0.0f,
+								{0.5f, 0.5f, 0.5f}
 							};
 
 Raycaster get_raycaster() {
 	return raycaster;
 }
 
-void set_tf_offset(float offset) {
-	raycaster.tf_offset = MINIMUM(MAXIMUM(raycaster.tf_offset+offset, 0), 0.9f);
+void change_tf_offset(float offset, bool reset) {
+	raycaster.tf_offset = MINIMUM(MAXIMUM(reset ? offset : raycaster.tf_offset + offset, 0), 0.9f);
 	printf("Transfer funcion offset: %4.3f\n", raycaster.tf_offset);
 }
 
-void set_ray_step(float step) {
-	raycaster.ray_step = MINIMUM(MAXIMUM(raycaster.ray_step+step, 0.001f), 1);
+void change_ray_step(float step, bool reset) {
+	raycaster.ray_step = MINIMUM(MAXIMUM(reset ? step : raycaster.ray_step + step, 0.001f), 1);
 	printf("Ray sampling step: %4.4f\n", raycaster.ray_step);
 }
 
-void set_ray_threshold(float threshold) {
-	raycaster.ray_thershold = MINIMUM(MAXIMUM(raycaster.ray_thershold+threshold, 0.25f), 1);
-	printf("Ray accumulation threshold: %4.3f\n", raycaster.ray_thershold);
+void change_ray_threshold(float threshold, bool reset) {
+	raycaster.ray_threshold = MINIMUM(MAXIMUM(reset ? threshold : raycaster.ray_threshold + threshold, 0.25f), 1);
+	printf("Ray accumulation threshold: %4.3f\n", raycaster.ray_threshold);
 }
 
 void set_raycaster_model(Volume_model model) {
 	raycaster.model = model;
+	int max_size = MAXIMUM(model.dims.x, MAXIMUM(model.dims.y, model.dims.z));
+	raycaster.ray_step = 2.0f / max_size;  // dlzka najvacsej hrany je 2 
+	raycaster.ray_step -= raycaster.ray_step / max_size;
+}
+
+void set_raycaster_view(View view) {
+	raycaster.view = view;
 }

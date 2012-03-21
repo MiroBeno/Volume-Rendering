@@ -59,6 +59,11 @@ inline __host__ __device__ float4 operator*(float4 a, float4 b)
     return make_float4(a.x * b.x, a.y * b.y, a.z * b.z,  a.w * b.w);
 }
 
+inline __host__ __device__ float4 operator+(float4 a, float3 b)
+{
+    return make_float4(a.x + b.x, a.y + b.y, a.z + b.z,  a.w);
+}
+
 // other
 
 inline __host__ __device__ unsigned int map_float_int(float f, unsigned int n) {		// mapuje float<0,1> na int<0,n-1>

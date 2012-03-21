@@ -12,8 +12,7 @@ static Volume_model volume = {	NULL,
 int load_file(const char *file_name, unsigned char **result, size_t *file_size) {
 	*file_size = 0;
 	FILE *f = fopen(file_name, "rb");
-	if (f == NULL) 
-	{ 
+	if (f == NULL) { 
 		*result = NULL;
 		return -1;				// chyba otvarania
 	} 
