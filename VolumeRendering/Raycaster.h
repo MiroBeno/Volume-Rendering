@@ -63,6 +63,8 @@ struct Raycaster {
 
 	__host__ __device__ void write_color(float4 color, int2 pos, uchar4 buffer[]) {
 		int offset = (pos.y * view.size_px.x + pos.x);
+		if (color.w <= ray_threshold)
+			color = color + (bg_color * (1 - color.w));
 		buffer[offset].x = map_float_int(color.x,256);
 		buffer[offset].y = map_float_int(color.y,256);
 		buffer[offset].z = map_float_int(color.z,256);

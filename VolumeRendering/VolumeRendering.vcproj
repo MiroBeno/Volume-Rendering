@@ -210,11 +210,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\volume_gpu_2.cu"
-				>
-			</File>
-			<File
-				RelativePath=".\volume_gpu_3.cu"
+				RelativePath=".\volume_gpu_23.cu"
 				>
 			</File>
 			<File

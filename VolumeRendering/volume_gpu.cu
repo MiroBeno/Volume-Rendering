@@ -8,10 +8,12 @@
 #include "cuda_runtime_api.h"
 
 dim3 THREADS_PER_BLOCK(16, 16);				// pocet threadov v bloku - podla occupancy calculator
+dim3 num_blocks((WIN_WIDTH + THREADS_PER_BLOCK.x - 1) / THREADS_PER_BLOCK.x,
+				(WIN_HEIGHT + THREADS_PER_BLOCK.y - 1) / THREADS_PER_BLOCK.y);
 
-unsigned char *dev_volume_data;
 uchar4 *dev_buffer;
 int dev_buffer_size = WIN_WIDTH * WIN_HEIGHT * 4;
+unsigned char *dev_volume_data;
 cudaEvent_t start, stop; 
 float elapsedTime;
 
@@ -34,7 +36,6 @@ __global__ void render_ray_gpu(Raycaster raycaster, uchar4 dev_buffer[]) {
 				break;
 		}
 	}
-	color_acc = color_acc + (raycaster.bg_color * (1 - color_acc.w));
 	raycaster.write_color(color_acc, pos, dev_buffer);
 }
 
@@ -46,6 +47,15 @@ extern void init_gpu(Volume_model volume) {
 	cudaEventCreate(&stop);
 }
 
+extern void resize_gpu(int2 window_size) {
+	cudaFree(dev_buffer);
+	dev_buffer_size = window_size.x * window_size.y * 4;
+	cudaMalloc((void **)&dev_buffer, dev_buffer_size);
+	num_blocks = dim3((window_size.x + THREADS_PER_BLOCK.x - 1) / THREADS_PER_BLOCK.x, 
+					  (window_size.y + THREADS_PER_BLOCK.y - 1) / THREADS_PER_BLOCK.y);		
+			// celociselne delenie, ak su rozmery okna nedelitelne 16, spustaju sa bloky s nevyuzitimi threadmi
+}
+
 extern void free_gpu() {
 	cudaFree(dev_buffer);
 	cudaFree(dev_volume_data);
@@ -53,17 +63,8 @@ extern void free_gpu() {
 	cudaEventDestroy(stop);
 }
 
-extern void reset_gpu_buffer(int buffer_size) {
-	cudaFree(dev_buffer);
-	dev_buffer_size = buffer_size;
-	cudaMalloc((void **)&dev_buffer, dev_buffer_size);
-}
-
 extern float render_volume_gpu(uchar4 *buffer, Raycaster current_raycaster) {
 	current_raycaster.model.data = dev_volume_data;
-	dim3 num_blocks((current_raycaster.view.size_px.x + THREADS_PER_BLOCK.x - 1) / THREADS_PER_BLOCK.x, 
-					(current_raycaster.view.size_px.y + THREADS_PER_BLOCK.y - 1) / THREADS_PER_BLOCK.y);		
-			// celociselne delenie, ak su rozmery okna nedelitelne 16, spustaju sa bloky s nevyuzitimi threadmi
 	cudaEventRecord(start, 0);
 	render_ray_gpu<<<num_blocks, THREADS_PER_BLOCK>>>(current_raycaster, dev_buffer);
 	cudaMemcpy(buffer, dev_buffer, dev_buffer_size, cudaMemcpyDeviceToHost);

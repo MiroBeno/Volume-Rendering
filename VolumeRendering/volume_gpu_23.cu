@@ -1,4 +1,4 @@
-// CUDA implementation using constant memory
+// CUDA implementation using constant memory / constant memory + GL interop
 
 #include "data_utils.h"
 #include "projection.h"
@@ -8,12 +8,13 @@
 #include "cuda_runtime_api.h"
 
 extern dim3 THREADS_PER_BLOCK;
+extern dim3 num_blocks;
 
 static __constant__ Raycaster raycaster;
 
-extern unsigned char *dev_volume_data;
 extern uchar4 *dev_buffer;
 extern int dev_buffer_size;
+extern unsigned char *dev_volume_data;
 extern cudaEvent_t start, stop; 
 extern float elapsedTime;
 
@@ -36,19 +37,26 @@ __global__ void render_ray_gpu2(uchar4 dev_buffer[]) {
 				break;
 		}
 	}
-	color_acc = color_acc + (raycaster.bg_color * (1 - color_acc.w));
 	raycaster.write_color(color_acc, pos, dev_buffer);
 }
 
 extern float render_volume_gpu2(uchar4 *buffer, Raycaster current_raycaster) {
 	current_raycaster.model.data = dev_volume_data;
-	dim3 num_blocks((current_raycaster.view.size_px.x + THREADS_PER_BLOCK.x - 1) / THREADS_PER_BLOCK.x, 
-					(current_raycaster.view.size_px.y + THREADS_PER_BLOCK.y - 1) / THREADS_PER_BLOCK.y);		
-			// celociselne delenie, ak su rozmery okna nedelitelne 16, spustaju sa bloky s nevyuzitimi threadmi
 	cudaEventRecord(start, 0);
 	cudaMemcpyToSymbol(raycaster, &current_raycaster, sizeof(Raycaster));
 	render_ray_gpu2<<<num_blocks, THREADS_PER_BLOCK>>>(dev_buffer);
 	cudaMemcpy(buffer, dev_buffer, dev_buffer_size, cudaMemcpyDeviceToHost);
+	cudaEventRecord(stop, 0);
+	cudaEventSynchronize(stop);
+	cudaEventElapsedTime(&elapsedTime, start, stop);
+	return elapsedTime;
+}
+
+extern float render_volume_gpu3(uchar4 *buffer, Raycaster current_raycaster) {
+	current_raycaster.model.data = dev_volume_data;
+	cudaEventRecord(start, 0);
+	cudaMemcpyToSymbol(raycaster, &current_raycaster, sizeof(Raycaster));
+	render_ray_gpu2<<<num_blocks, THREADS_PER_BLOCK>>>(buffer);
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&elapsedTime, start, stop);

@@ -25,7 +25,6 @@ void render_ray_cpu(uchar4 buffer[], int2 pos) {
 				break;
 		}
 	}
-	color_acc = color_acc + (raycaster.bg_color * (1 - color_acc.w));	
 	raycaster.write_color(color_acc, pos, buffer);
 }
 
