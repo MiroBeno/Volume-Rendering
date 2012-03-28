@@ -20,8 +20,6 @@ static __constant__ Raycaster raycaster;
 //static __constant__ float4 dev_transfer_fn[256];
 
 extern unsigned char *dev_volume_data;
-extern cudaEvent_t start, stop; 
-extern float elapsedTime;
 cudaArray *volume_array = 0;
 texture<unsigned char, 3, cudaReadModeNormalizedFloat> volume_texture;
 cudaArray *transfer_fn_array = 0;
@@ -65,13 +63,15 @@ extern void set_transfer_fn_gpu4(float4 *transfer_fn) {
 		cudaMallocArray(&transfer_fn_array, &channelDesc, 256, 1); 
 		cudaMemcpyToArray(transfer_fn_array, 0, 0, transfer_fn, 256 * sizeof(float4), cudaMemcpyHostToDevice);
 
-		//transfer_fn_texture.filterMode = cudaFilterModeLinear;
+		transfer_fn_texture.filterMode = cudaFilterModeLinear; //vypnut pri cm 
 		transfer_fn_texture.normalized = true;
 		transfer_fn_texture.addressMode[0] = cudaAddressModeClamp; 
 		cudaBindTextureToArray(transfer_fn_texture, transfer_fn_array, channelDesc);
 	}
-	//cudaMemcpyToArray(transfer_fn_array, 0, 0, transfer_fn, sizeof(transfer_fn), cudaMemcpyHostToDevice);
-	//cudaMemcpyToSymbol(dev_transfer_fn, transfer_fn, 256 * sizeof(float4));
+	else {
+		cudaMemcpyToArray(transfer_fn_array, 0, 0, transfer_fn, 256 * sizeof(float4), cudaMemcpyHostToDevice);
+		//cudaMemcpyToSymbol(dev_transfer_fn, transfer_fn, 256 * sizeof(float4));
+	}
 }
 
 extern void init_gpu4(Volume_model volume) {
@@ -87,7 +87,7 @@ extern void init_gpu4(Volume_model volume) {
     cudaMemcpy3D(&copyParams);
 
     volume_texture.normalized = true;                      
-    //volume_texture.filterMode = cudaFilterModeLinear;      
+    volume_texture.filterMode = cudaFilterModeLinear; //vypnut pri cm     
     volume_texture.addressMode[0] = cudaAddressModeClamp;  
     volume_texture.addressMode[1] = cudaAddressModeClamp;
     volume_texture.addressMode[2] = cudaAddressModeClamp;
@@ -102,11 +102,7 @@ extern void free_gpu4() {
 }
 
 extern float render_volume_gpu4(uchar4 *buffer, Raycaster *current_raycaster) {
-	cudaEventRecord(start, 0);
 	cudaMemcpyToSymbol(raycaster, current_raycaster, sizeof(Raycaster));
 	render_ray_gpu4<<<num_blocks, THREADS_PER_BLOCK>>>(buffer);
-	cudaEventRecord(stop, 0);
-	cudaEventSynchronize(stop);
-	cudaEventElapsedTime(&elapsedTime, start, stop);
-	return elapsedTime;
+	return 0;
 }

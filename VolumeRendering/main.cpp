@@ -13,14 +13,14 @@
 #include "cuda_runtime_api.h"
 #include "cuda_gl_interop.h"
 
-const char *APP_NAME = "Naive VR. ";
+const char *APP_NAME = "Naive VR.";
 const int timer_msecs = 1;
 //const char *FILE_NAME = "Bucky.raw";						// 32x32x32 x 8bit
 //const char *FILE_NAME = "Foot.raw";						// 256x256x256 x 8bit
 const char *FILE_NAME = "VisMale.raw";						// 128x256x256 x 8bit
 //const char *FILE_NAME = "XMasTree.raw";					// 512x499x512 x 8bit
 
-static int window_id;
+static int window_id, subwindow_id;
 static int2 window_size = {WIN_WIDTH, WIN_HEIGHT};
 static bool window_resize_flag = false;
 static GLuint pbo_gl_id = NULL;
@@ -28,10 +28,11 @@ static GLuint pbo_gl_id = NULL;
 static int gpu_id;
 static cudaGraphicsResource *pbo_cuda_id;
 
-static int renderer_id = 5;
+static int renderer_id = 2;
 static int4 mouse_state = make_int4(0, 0, 0, GLUT_UP);
-static int2 auto_rotate_vector = {-5, -5};
+static int2 auto_rotate_vector = {0, 0};
 
+cudaEvent_t start, stop; 
 float elapsed_time = 0;
 char title_string[256];
 char append_string[256];
@@ -57,7 +58,7 @@ extern float render_volume_cpu(uchar4 *buffer, Raycaster *current_raycaster);
 extern void set_transfer_fn_cpu(float4 *transfer_fn);
 
 void reset_PBO() {
-	//printf("reset\n");
+	printf("Setting PBO...\n");
     if (pbo_gl_id != NULL) {
 		cudaGraphicsUnregisterResource(pbo_cuda_id);
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
@@ -92,7 +93,8 @@ void finalize_PBO() {
 }
 
 void draw_volume() {
-	//printf("draw\n");
+	//printf("Drawing volume...\n");
+	glutSetWindow(window_id);
 	if (window_resize_flag) {
 		reset_PBO();
 		resize_gpu(window_size);
@@ -101,31 +103,34 @@ void draw_volume() {
 	}
 	set_raycaster_view(get_view());
 	uchar4 *pbo_array = prepare_PBO();
+	cudaEventRecord(start, 0);
 	switch (renderer_id) {
 		case 1:
-			elapsed_time = render_volume_cpu(pbo_array, get_raycaster());
-			sprintf(append_string, "CPU @ %3.4f ms", elapsed_time);
+			render_volume_cpu(pbo_array, get_raycaster());
+			sprintf(append_string, "CPU");
 			break;
 		case 2 :
-			elapsed_time = render_volume_gpu(pbo_array, get_raycaster());
-			sprintf(append_string, "CUDA Straightforward @ %3.4f ms", elapsed_time);
+			render_volume_gpu(pbo_array, get_raycaster());
+			sprintf(append_string, "CUDA Straightforward");
 			break;
 		case 3 :
-			elapsed_time = render_volume_gpu2(pbo_array, get_raycaster());
-			sprintf(append_string, "CUDA Constant Memory @ %3.4f ms", elapsed_time);
+			render_volume_gpu2(pbo_array, get_raycaster());
+			sprintf(append_string, "CUDA Constant Memory");
 			break;
 		case 4 :
-			elapsed_time = render_volume_gpu3(pbo_array, get_raycaster());
-			sprintf(append_string, "CUDA CM + GL interop @ %3.4f ms", elapsed_time);
+			render_volume_gpu3(pbo_array, get_raycaster());
+			sprintf(append_string, "CUDA CM + GL interop");
 			break;
 		case 5 :
-			elapsed_time = render_volume_gpu4(pbo_array, get_raycaster());
-			sprintf(append_string, "CUDA CM + 3D Texture Memory + GL interop @ %3.4f ms", elapsed_time);
+			render_volume_gpu4(pbo_array, get_raycaster());
+			sprintf(append_string, "CUDA CM + 3D Texture Memory + GL interop");
 			break;
 	}
+	cudaEventRecord(stop, 0);
+	cudaEventSynchronize(stop);
+	cudaEventElapsedTime(&elapsed_time, start, stop);
 	finalize_PBO();
-	strcpy(title_string, APP_NAME);
-	strcat(title_string, append_string);
+	sprintf(title_string, "%s %s @ %3.4f ms", APP_NAME, append_string, elapsed_time);
 	glutSetWindowTitle(title_string);
 	glutPostRedisplay();
 }
@@ -193,18 +198,21 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		glDeleteBuffersARB(1, &pbo_gl_id);
 		free_gpu4();
 		free_gpu();
+		cudaEventDestroy(start);
+		cudaEventDestroy(stop);
 		glutDestroyWindow(window_id);
 		exit(0);
 	}
 }
 
 void display_callback(void) {
-	//printf("display\n");
+	//printf("Main window display callback...\n");
 	glDrawPixels(window_size.x, window_size.y, GL_RGBA, GL_UNSIGNED_BYTE, 0);
 	glutSwapBuffers();
 }
 
 void timer_callback(int value) {
+	//printf("Timer ticked...\n");
 	if (auto_rotate_vector.x != 0 && mouse_state.w == GLUT_UP)
 		camera_right(auto_rotate_vector.x);
 	if (auto_rotate_vector.y != 0 && mouse_state.w == GLUT_UP) 
@@ -224,7 +232,7 @@ void mouse_callback(int button, int state, int x, int y) {
 		if (abs(auto_rotate_vector.x) < 8 && abs(auto_rotate_vector.y) < 8)
 			auto_rotate_vector = make_int2(0, 0);
 	}
-	//printf("click button:%i state:%i x:%i y:%i\n", button, state, x, y);
+	//printf("Mouse click: button:%i state:%i x:%i y:%i\n", button, state, x, y);
 }
 
 void motion_callback(int x, int y) {
@@ -239,12 +247,46 @@ void motion_callback(int x, int y) {
 }
 
 void reshape_callback(int w, int h) {
-	//printf("resize\n");
+	//printf("Resizing main window...\n");
 	if (window_size.x != w || window_size.y != h) {
 		window_size.x = w;
 		window_size.y = h;
 		window_resize_flag = true;
 	}
+	glutSetWindow(subwindow_id);
+	glutPositionWindow(window_size.x/20, (window_size.y/20)*17);
+	glutReshapeWindow((window_size.x*18)/20, window_size.y/10);
+	glutSetWindow(window_id);
+}
+
+void display_callback_sub(void) {
+	//printf("Drawing subwindow...\n");
+	glClear(GL_COLOR_BUFFER_BIT);	
+	glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	for (int i=0; i < 255; i++) {
+		glBegin(GL_POLYGON);
+		glColor4f(transfer_fn_lol[i].x, transfer_fn_lol[i].y, transfer_fn_lol[i].z, 1.0f);
+		glVertex2f(i, 0);
+		glVertex2f(i, transfer_fn_lol[i].w);
+		glColor4f(transfer_fn_lol[i+1].x, transfer_fn_lol[i+1].y, transfer_fn_lol[i+1].z, 1.0f);
+		glVertex2f(i+1, transfer_fn_lol[i+1].w);
+		glVertex2f(i+1, 0);
+		glEnd();
+	}
+	glDisable(GL_BLEND);
+}
+
+void motion_callback_sub(int x, int y) {
+	//printf("Mouse subwindow: x:%i y:%i\n", x, y);
+	int sample = CLAMP((int)(x / (glutGet(GLUT_WINDOW_WIDTH) / 256.0f)), 0, 255);
+	float intensity = CLAMP(1.0f - y / (float)glutGet(GLUT_WINDOW_HEIGHT), 0, 1.0f);
+	transfer_fn_lol[sample].w = intensity;
+	glutPostRedisplay();
+	set_transfer_fn_cpu(transfer_fn_lol);
+	set_transfer_fn_gpu(transfer_fn_lol);
+	set_transfer_fn_gpu23(transfer_fn_lol);
+	set_transfer_fn_gpu4(transfer_fn_lol);
 }
 
 int main(int argc, char **argv) {
@@ -255,7 +297,7 @@ int main(int argc, char **argv) {
 	}
 
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);		//GLUT_DOUBLE (+ glutSwapBuffers().  Rozdiely? Pomalsie pri double znacne, aj ked sa meria iba cas kernelu!)
+	glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);		//GLUT_DOUBLE
 	glutInitWindowSize(window_size.x, window_size.y);
 	glutInitWindowPosition(100,1);
 	window_id = glutCreateWindow(APP_NAME);
@@ -265,6 +307,17 @@ int main(int argc, char **argv) {
     glutMotionFunc(motion_callback);
 	glutTimerFunc(timer_msecs, timer_callback, 0);
 	glutReshapeFunc(reshape_callback);
+
+	subwindow_id = glutCreateSubWindow(window_id, window_size.x/20, (window_size.y/20)*17, 256, 1);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho (0, 256, 0, 1, 0, 1);
+	glMatrixMode (GL_MODELVIEW);
+	glDisable(GL_DEPTH_TEST);
+	glClearColor(0.75f, 0.75f, 0.75f, 0.75f);
+	glutDisplayFunc(display_callback_sub);
+	glutMotionFunc(motion_callback_sub);
+	glutSetWindow(window_id);
 
 	GLenum err = glewInit();
 	if (GLEW_OK != err) {
@@ -290,8 +343,10 @@ int main(int argc, char **argv) {
 	prop.major = 0;
 	cudaChooseDevice(&gpu_id, &prop);
 	cudaGLSetGLDevice(gpu_id);
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
 
-	reset_PBO(); 
+	reset_PBO();
 	set_raycaster_model(get_model());
 	init_gpu(get_model(), window_size);
 	init_gpu4(get_model());
@@ -300,7 +355,7 @@ int main(int argc, char **argv) {
 	set_transfer_fn_gpu23(transfer_fn_lol);
 	set_transfer_fn_gpu4(transfer_fn_lol);
 
-	printf("size: %i B\n",sizeof(Raycaster));
+	printf("Raycaster data size: %i B\n",sizeof(Raycaster));
 	glutMainLoop();
 	return 1;
 }

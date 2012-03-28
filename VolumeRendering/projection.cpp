@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "projection.h"
 
-const float2 distance_limits = {10, 0.1f};
+const float2 distance_limits = {0.1f, 10};
 
 static float2 cam_angles = {0, 0};			// x - horizontalny uhol, y - vertikalny uhol
 static float cam_distance = 2;
@@ -69,7 +69,7 @@ float3 camera_right(float angle) {
 }
 
 float3 camera_zoom(float distance) {
-	cam_distance = MAXIMUM(MINIMUM(cam_distance + distance, distance_limits.x), distance_limits.y);
+	cam_distance = CLAMP(cam_distance + distance, distance_limits.x, distance_limits.y);
 	return compute_camera_position();
 }
 

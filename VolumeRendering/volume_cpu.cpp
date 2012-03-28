@@ -3,11 +3,6 @@
 #include "model.h"
 #include "raycaster.h"
 
-#include <ctime>
-
-static clock_t startTime;
-static float elapsedTime;
-
 static float4 *my_transfer_fn;
 
 inline void render_ray_cpu(Raycaster raycaster, uchar4 buffer[], int2 pos) {
@@ -33,11 +28,9 @@ extern void set_transfer_fn_cpu(float4 *transfer_fn) {
 }
 
 extern float render_volume_cpu(uchar4 *buffer, Raycaster *current_raycaster) {
-	startTime = clock();
 	for(int row = 0; row < current_raycaster->view.size_px.y; row++)
 		for(int col = 0; col < current_raycaster->view.size_px.x; col++)	{
 			render_ray_cpu(*current_raycaster, buffer, make_int2(col, row));
 		}
-	elapsedTime = (clock() - startTime) / (CLOCKS_PER_SEC / 1000.0f);
-	return elapsedTime;
+	return 0;
 }

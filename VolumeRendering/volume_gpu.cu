@@ -14,8 +14,6 @@ uchar4 *dev_buffer;
 int dev_buffer_size;
 unsigned char *dev_volume_data;
 float4 *dev_transfer_fn;
-cudaEvent_t start, stop; 
-float elapsedTime;
 
 __global__ void render_ray_gpu(Raycaster raycaster, uchar4 dev_buffer[], unsigned char dev_volume_data[], float4 dev_transfer_fn[]) {
 	int2 pos = {blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y};
@@ -59,24 +57,16 @@ extern void init_gpu(Volume_model volume, int2 window_size) {
 	cudaMalloc((void **)&dev_volume_data, volume.size);
 	cudaMemcpy(dev_volume_data, volume.data, volume.size, cudaMemcpyHostToDevice);
 	resize_gpu(window_size);
-	cudaEventCreate(&start);
-	cudaEventCreate(&stop);
 }
 
 extern void free_gpu() {
 	cudaFree(dev_buffer);
 	cudaFree(dev_volume_data);
 	cudaFree(dev_transfer_fn);
-	cudaEventDestroy(start);
-	cudaEventDestroy(stop);
 }
 
 extern float render_volume_gpu(uchar4 *buffer, Raycaster *current_raycaster) {
-	cudaEventRecord(start, 0);
 	render_ray_gpu<<<num_blocks, THREADS_PER_BLOCK>>>(*current_raycaster, dev_buffer, dev_volume_data, dev_transfer_fn);
 	cudaMemcpy(buffer, dev_buffer, dev_buffer_size, cudaMemcpyDeviceToHost);
-	cudaEventRecord(stop, 0);
-	cudaEventSynchronize(stop);
-	cudaEventElapsedTime(&elapsedTime, start, stop);
-	return elapsedTime;
+	return 0;
 }

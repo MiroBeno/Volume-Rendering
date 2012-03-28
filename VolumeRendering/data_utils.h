@@ -10,6 +10,7 @@
 #define PI 3.141592654f
 #define MAXIMUM(a,b) ((a)>(b)?(a):(b))
 #define MINIMUM(a,b) ((a)<(b)?(a):(b))
+#define CLAMP(x,low,high) (MINIMUM((high),MAXIMUM((low),(x))))
 #define DEG_TO_RAD(a) ((a) * PI / 180)
 
 // float3 ops

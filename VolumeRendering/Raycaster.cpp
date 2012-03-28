@@ -17,17 +17,17 @@ Raycaster *get_raycaster() {
 }
 
 void change_tf_offset(float offset, bool reset) {
-	raycaster.tf_offset = MINIMUM(MAXIMUM(reset ? offset : raycaster.tf_offset + offset, 0), 0.9f);
+	raycaster.tf_offset = CLAMP(reset ? offset : raycaster.tf_offset + offset, 0, 0.9f);
 	printf("Transfer funcion offset: %4.3f\n", raycaster.tf_offset);
 }
 
 void change_ray_step(float step, bool reset) {
-	raycaster.ray_step = MINIMUM(MAXIMUM(reset ? step : raycaster.ray_step + step, 0.001f), 1);
+	raycaster.ray_step = CLAMP(reset ? step : raycaster.ray_step + step, 0.001f, 1);
 	printf("Ray sampling step: %4.4f\n", raycaster.ray_step);
 }
 
 void change_ray_threshold(float threshold, bool reset) {
-	raycaster.ray_threshold = MINIMUM(MAXIMUM(reset ? threshold : raycaster.ray_threshold + threshold, 0.25f), 1);
+	raycaster.ray_threshold = CLAMP(reset ? threshold : raycaster.ray_threshold + threshold, 0.25f, 1);
 	printf("Ray accumulation threshold: %4.3f\n", raycaster.ray_threshold);
 }
 
@@ -38,7 +38,10 @@ void set_raycaster_model(Volume_model model) {
 	raycaster.ray_step -= raycaster.ray_step / max_size;
 	/**/
 	for (int i =0; i < 256; i++) {
-		transfer_fn_lol[i] = make_float4(i/255.0f, i/255.0f, i/255.0f, i/255.0f);
+		transfer_fn_lol[i] = make_float4(i <= 85 ? (i*3)/255.0f : 0.0f, 
+										(i > 85) && (i <= 170) ? ((i-85)*3)/255.0f : 0.0f, 
+										i > 170 ? ((i-170)*3)/255.0f : 0.0f, 
+										i/255.0f);
 	}
 }
 
