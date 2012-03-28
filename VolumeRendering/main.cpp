@@ -17,7 +17,7 @@ const char *APP_NAME = "Naive VR. ";
 const int timer_msecs = 1;
 //const char *FILE_NAME = "Bucky.raw";						// 32x32x32 x 8bit
 //const char *FILE_NAME = "Foot.raw";						// 256x256x256 x 8bit
-const char *FILE_NAME = "VisMale.raw";					// 128x256x256 x 8bit
+const char *FILE_NAME = "VisMale.raw";						// 128x256x256 x 8bit
 //const char *FILE_NAME = "XMasTree.raw";					// 512x499x512 x 8bit
 
 static int window_id;
@@ -29,27 +29,32 @@ static int gpu_id;
 static cudaGraphicsResource *pbo_cuda_id;
 
 static int renderer_id = 5;
-static int3 mouse_state;
+static int4 mouse_state = make_int4(0, 0, 0, GLUT_UP);
 static int2 auto_rotate_vector = {-5, -5};
 
 float elapsed_time = 0;
 char title_string[256];
 char append_string[256];
 
-extern float render_volume_gpu(uchar4 *buffer, Raycaster current_raycaster);
-extern void init_gpu(Volume_model volume);
+extern float4 transfer_fn_lol[];
+
+extern float render_volume_gpu(uchar4 *buffer, Raycaster *current_raycaster);
+extern void init_gpu(Volume_model volume, int2 window_size);
+extern void set_transfer_fn_gpu(float4 *transfer_fn);
 extern void resize_gpu(int2 window_size);
 extern void free_gpu();
 
-extern float render_volume_gpu2(uchar4 *buffer, Raycaster current_raycaster);
+extern float render_volume_gpu2(uchar4 *buffer, Raycaster *current_raycaster);
+extern float render_volume_gpu3(uchar4 *buffer, Raycaster *current_raycaster);
+extern void set_transfer_fn_gpu23(float4 *transfer_fn);
 
-extern float render_volume_gpu3(uchar4 *buffer, Raycaster current_raycaster);
-
-extern float render_volume_gpu4(uchar4 *buffer, Raycaster current_raycaster);
+extern float render_volume_gpu4(uchar4 *buffer, Raycaster *current_raycaster);
 extern void init_gpu4(Volume_model volume);
+extern void set_transfer_fn_gpu4(float4 *transfer_fn);
 extern void free_gpu4();
 
-extern float render_volume_cpu(uchar4 *buffer, Raycaster current_raycaster);
+extern float render_volume_cpu(uchar4 *buffer, Raycaster *current_raycaster);
+extern void set_transfer_fn_cpu(float4 *transfer_fn);
 
 void reset_PBO() {
 	//printf("reset\n");
@@ -149,8 +154,14 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		draw_volume();
 	}
 	if (key=='r') {
-		//auto_rotate = !auto_rotate;
-		//printf("Autorotation: %s\n", auto_rotate ? "on" : "off");
+		if (auto_rotate_vector.x == 0 && auto_rotate_vector.y == 0) {
+			auto_rotate_vector = make_int2(-5, -5);
+			printf("Autorotation: on\n");
+		}
+		else {
+			auto_rotate_vector = make_int2(0, 0);
+			printf("Autorotation: off\n");
+		}
 	}
 	switch (key) {
 		case 'w': camera_down(-5.0f); break;
@@ -177,12 +188,12 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		case '0': set_camera_position(2,0,0); break;
 	}
 	if (key==27) {
-		glutDestroyWindow(window_id);
 		cudaGraphicsUnregisterResource(pbo_cuda_id);
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 		glDeleteBuffersARB(1, &pbo_gl_id);
 		free_gpu4();
 		free_gpu();
+		glutDestroyWindow(window_id);
 		exit(0);
 	}
 }
@@ -194,10 +205,10 @@ void display_callback(void) {
 }
 
 void timer_callback(int value) {
-	if (auto_rotate_vector.x != 0 || auto_rotate_vector.y != 0) {
+	if (auto_rotate_vector.x != 0 && mouse_state.w == GLUT_UP)
 		camera_right(auto_rotate_vector.x);
+	if (auto_rotate_vector.y != 0 && mouse_state.w == GLUT_UP) 
 		camera_down(auto_rotate_vector.y);
-	}
 	draw_volume();
 	glutTimerFunc(timer_msecs, timer_callback, 0);
 }
@@ -206,15 +217,12 @@ void mouse_callback(int button, int state, int x, int y) {
 	mouse_state.x = x;
 	mouse_state.y = y;
 	mouse_state.z = button;
-	if (state == GLUT_DOWN) {
-		auto_rotate_vector.x = 0;
-		auto_rotate_vector.y = 0;
-	}
+	mouse_state.w = state;
+	if (state == GLUT_DOWN) 
+		auto_rotate_vector = make_int2(0, 0);
 	if (state == GLUT_UP) {
-		if (abs(auto_rotate_vector.x) < 8 && abs(auto_rotate_vector.y) < 8) {
-			auto_rotate_vector.x = 0;
-			auto_rotate_vector.y = 0;
-		}
+		if (abs(auto_rotate_vector.x) < 8 && abs(auto_rotate_vector.y) < 8)
+			auto_rotate_vector = make_int2(0, 0);
 	}
 	//printf("click button:%i state:%i x:%i y:%i\n", button, state, x, y);
 }
@@ -247,7 +255,7 @@ int main(int argc, char **argv) {
 	}
 
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);		//GLUT_DOUBLE (+ glutSwapBuffers().  Rozdiely? Pomalsie pri double znacne, aj ked sa meria iba cas kernelu!)
+	glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);		//GLUT_DOUBLE (+ glutSwapBuffers().  Rozdiely? Pomalsie pri double znacne, aj ked sa meria iba cas kernelu!)
 	glutInitWindowSize(window_size.x, window_size.y);
 	glutInitWindowPosition(100,1);
 	window_id = glutCreateWindow(APP_NAME);
@@ -271,24 +279,28 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
-	cudaDeviceProp prop;
-	memset(&prop, 0, sizeof(cudaDeviceProp));
-	prop.major = 1;
-	prop.major = 0;
-	cudaChooseDevice(&gpu_id, &prop);
-
-	cudaGLSetGLDevice(gpu_id);
-	reset_PBO(); 
-
 	printf("Use '12345' to change renderer\n    'wasd' and '7890' to manipulate camera position\n");
 	printf("    'op' to change ray sampling rate\n    'kl' to change transfer function offset\n");
 	printf("    'nm' to change ray accumulation threshold\n    'r' to toggle autorotation\n");
 	printf("    '-' to toggle perspective and orthogonal projection\n\n");
 
-	set_raycaster_model(get_model());
-	init_gpu(get_model());
-	init_gpu4(get_model());
+	cudaDeviceProp prop;
+	memset(&prop, 0, sizeof(cudaDeviceProp));
+	prop.major = 1;
+	prop.major = 0;
+	cudaChooseDevice(&gpu_id, &prop);
+	cudaGLSetGLDevice(gpu_id);
 
+	reset_PBO(); 
+	set_raycaster_model(get_model());
+	init_gpu(get_model(), window_size);
+	init_gpu4(get_model());
+	set_transfer_fn_cpu(transfer_fn_lol);
+	set_transfer_fn_gpu(transfer_fn_lol);
+	set_transfer_fn_gpu23(transfer_fn_lol);
+	set_transfer_fn_gpu4(transfer_fn_lol);
+
+	printf("size: %i B\n",sizeof(Raycaster));
 	glutMainLoop();
-	return 0;
+	return 1;
 }

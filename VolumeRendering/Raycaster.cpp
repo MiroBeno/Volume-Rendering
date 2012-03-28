@@ -10,8 +10,10 @@ static Raycaster raycaster = {	Volume_model(),
 								{0.5f, 0.5f, 0.5f}
 							};
 
-Raycaster get_raycaster() {
-	return raycaster;
+float4 transfer_fn_lol[256];
+
+Raycaster *get_raycaster() {
+	return &raycaster;
 }
 
 void change_tf_offset(float offset, bool reset) {
@@ -34,6 +36,10 @@ void set_raycaster_model(Volume_model model) {
 	int max_size = MAXIMUM(model.dims.x, MAXIMUM(model.dims.y, model.dims.z));
 	raycaster.ray_step = 2.0f / max_size;  // dlzka najvacsej hrany je 2 
 	raycaster.ray_step -= raycaster.ray_step / max_size;
+	/**/
+	for (int i =0; i < 256; i++) {
+		transfer_fn_lol[i] = make_float4(i/255.0f, i/255.0f, i/255.0f, i/255.0f);
+	}
 }
 
 void set_raycaster_view(View view) {

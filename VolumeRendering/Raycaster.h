@@ -18,23 +18,13 @@ struct Raycaster {
 	float tf_offset;
 	float3 bg_color;
 
-	__host__ __device__ float4 transfer_function(float sample, float3 pos) {
-		float4 intensity = {sample, sample, sample, sample >= tf_offset ? sample : 0};
-		float4 color = {(pos.x+1)*0.5f, (pos.y+1)*0.5f, (pos.z+1)*0.5f, 1};
-		color = color * intensity;
+	__host__ __device__ float4 sample_color(unsigned char volume_data[], float4 transfer_fn[], float3 pos) {
+		unsigned char sample = model.sample_data(volume_data, pos);
+		float4 color = transfer_fn[sample];  // (int)sample
 		color.x *= color.w;				// aplikovanie optickeho modelu pre kompoziciu (farba * alfa)
 		color.y *= color.w;
 		color.z *= color.w;
 		return color;
-	}
-
-	__host__ __device__ float4 sample_color(float3 pos) {
-	#if 1
-		return transfer_function(model.sample_data(pos), pos);
-	#else
-		float4 color = {(pos.x+1)*0.5f, (pos.y+1)*0.5f, (pos.z+1)*0.5f, 0.1f};  // prepocitanie polohy bodu <-1;1>(x,y,z) na float vyjadrenie farby <0;1>(r,g,b,1)
-		return color;	
-	#endif
 	}
 
 	__host__ __device__ float2 intersect_1D(float pt, float dir, float min_bound, float max_bound) {
@@ -62,15 +52,14 @@ struct Raycaster {
 	}												// pri vypocte k mozu vzniknut artefakty, a hodnoty mozu byt mimo volume, mozno riesit k +-= 0.00001f; alebo clampovanim vysledku na stenu
 
 	__host__ __device__ void write_color(float4 color, int2 pos, uchar4 buffer[]) {
-		int offset = (pos.y * view.size_px.x + pos.x);
 		if (color.w <= ray_threshold)
 			color = color + (bg_color * (1 - color.w));
-		buffer[offset].x = map_float_int(color.x,256);
-		buffer[offset].y = map_float_int(color.y,256);
-		buffer[offset].z = map_float_int(color.z,256);
-		buffer[offset].w = 255;
+		buffer[pos.y * view.size_px.x + pos.x] = 
+			make_uchar4( map_float_int(color.x,256), 
+						map_float_int(color.y,256), 
+						map_float_int(color.z,256), 
+						255);
 	}
-
 };
 
 void change_tf_offset(float offset, bool reset);
@@ -80,6 +69,6 @@ void change_ray_threshold(float threshold, bool reset);
 void set_raycaster_model(Volume_model model);
 void set_raycaster_view(View view);
 
-Raycaster get_raycaster();
+Raycaster *get_raycaster();
 
 #endif
