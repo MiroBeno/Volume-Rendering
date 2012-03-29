@@ -70,5 +70,6 @@ void set_raycaster_model(Volume_model model);
 void set_raycaster_view(View view);
 
 Raycaster *get_raycaster();
+float4 *get_transfer_fn();
 
 #endif

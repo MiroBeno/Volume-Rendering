@@ -37,8 +37,6 @@ float elapsed_time = 0;
 char title_string[256];
 char append_string[256];
 
-extern float4 transfer_fn_lol[];
-
 extern float render_volume_gpu(uchar4 *buffer, Raycaster *current_raycaster);
 extern void init_gpu(Volume_model volume, int2 window_size);
 extern void set_transfer_fn_gpu(float4 *transfer_fn);
@@ -264,13 +262,14 @@ void display_callback_sub(void) {
 	glClear(GL_COLOR_BUFFER_BIT);	
 	glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	float4 *transfer_fn = get_transfer_fn();
 	for (int i=0; i < 255; i++) {
 		glBegin(GL_POLYGON);
-		glColor4f(transfer_fn_lol[i].x, transfer_fn_lol[i].y, transfer_fn_lol[i].z, 1.0f);
+		glColor4f(transfer_fn[i].x, transfer_fn[i].y, transfer_fn[i].z, 1.0f);
 		glVertex2f(i, 0);
-		glVertex2f(i, transfer_fn_lol[i].w);
-		glColor4f(transfer_fn_lol[i+1].x, transfer_fn_lol[i+1].y, transfer_fn_lol[i+1].z, 1.0f);
-		glVertex2f(i+1, transfer_fn_lol[i+1].w);
+		glVertex2f(i, transfer_fn[i].w);
+		glColor4f(transfer_fn[i+1].x, transfer_fn[i+1].y, transfer_fn[i+1].z, 1.0f);
+		glVertex2f(i+1, transfer_fn[i+1].w);
 		glVertex2f(i+1, 0);
 		glEnd();
 	}
@@ -278,15 +277,30 @@ void display_callback_sub(void) {
 }
 
 void motion_callback_sub(int x, int y) {
-	//printf("Mouse subwindow: x:%i y:%i\n", x, y);
-	int sample = CLAMP((int)(x / (glutGet(GLUT_WINDOW_WIDTH) / 256.0f)), 0, 255);
-	float intensity = CLAMP(1.0f - y / (float)glutGet(GLUT_WINDOW_HEIGHT), 0, 1.0f);
-	transfer_fn_lol[sample].w = intensity;
+	float4 *transfer_fn = get_transfer_fn();
+	float win_width = (float)glutGet(GLUT_WINDOW_WIDTH), win_height = (float)glutGet(GLUT_WINDOW_HEIGHT);
+	int steps = abs(x - mouse_state.x);
+	int x_delta = mouse_state.x < x ? 1 : -1;
+	float y_delta = (steps == 0) ? 0 : (y - mouse_state.y) / (float)steps;
+	for (int i = 0; i <= steps; i++) {
+		int sample = CLAMP((int)((mouse_state.x + i * x_delta) / (win_width / 256)), 0, 255);
+		float intensity = CLAMP(1.0f - (mouse_state.y + i * y_delta) / win_height, 0, 1.0f);
+		transfer_fn[sample].w = intensity;
+	}
+	mouse_state.x = x;
+	mouse_state.y = y;
 	glutPostRedisplay();
-	set_transfer_fn_cpu(transfer_fn_lol);
-	set_transfer_fn_gpu(transfer_fn_lol);
-	set_transfer_fn_gpu23(transfer_fn_lol);
-	set_transfer_fn_gpu4(transfer_fn_lol);
+	set_transfer_fn_cpu(transfer_fn);
+	set_transfer_fn_gpu(transfer_fn);
+	set_transfer_fn_gpu23(transfer_fn);
+	set_transfer_fn_gpu4(transfer_fn);
+}
+
+void mouse_callback_sub(int button, int state, int x, int y) {
+	mouse_state.x = x;
+	mouse_state.y = y;
+	mouse_state.z = button;
+	motion_callback_sub(x, y);
 }
 
 int main(int argc, char **argv) {
@@ -316,6 +330,7 @@ int main(int argc, char **argv) {
 	glDisable(GL_DEPTH_TEST);
 	glClearColor(0.75f, 0.75f, 0.75f, 0.75f);
 	glutDisplayFunc(display_callback_sub);
+	glutMouseFunc(mouse_callback_sub);
 	glutMotionFunc(motion_callback_sub);
 	glutSetWindow(window_id);
 
@@ -350,10 +365,10 @@ int main(int argc, char **argv) {
 	set_raycaster_model(get_model());
 	init_gpu(get_model(), window_size);
 	init_gpu4(get_model());
-	set_transfer_fn_cpu(transfer_fn_lol);
-	set_transfer_fn_gpu(transfer_fn_lol);
-	set_transfer_fn_gpu23(transfer_fn_lol);
-	set_transfer_fn_gpu4(transfer_fn_lol);
+	set_transfer_fn_cpu(get_transfer_fn());
+	set_transfer_fn_gpu(get_transfer_fn());
+	set_transfer_fn_gpu23(get_transfer_fn());
+	set_transfer_fn_gpu4(get_transfer_fn());
 
 	printf("Raycaster data size: %i B\n",sizeof(Raycaster));
 	glutMainLoop();

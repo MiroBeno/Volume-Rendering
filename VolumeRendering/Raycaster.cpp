@@ -10,10 +10,14 @@ static Raycaster raycaster = {	Volume_model(),
 								{0.5f, 0.5f, 0.5f}
 							};
 
-float4 transfer_fn_lol[256];
+static float4 transfer_fn[256];
 
 Raycaster *get_raycaster() {
 	return &raycaster;
+}
+
+float4 *get_transfer_fn() {
+	return transfer_fn;
 }
 
 void change_tf_offset(float offset, bool reset) {
@@ -38,7 +42,7 @@ void set_raycaster_model(Volume_model model) {
 	raycaster.ray_step -= raycaster.ray_step / max_size;
 	/**/
 	for (int i =0; i < 256; i++) {
-		transfer_fn_lol[i] = make_float4(i <= 85 ? (i*3)/255.0f : 0.0f, 
+		transfer_fn[i] = make_float4(i <= 85 ? (i*3)/255.0f : 0.0f, 
 										(i > 85) && (i <= 170) ? ((i-85)*3)/255.0f : 0.0f, 
 										i > 170 ? ((i-170)*3)/255.0f : 0.0f, 
 										i/255.0f);
