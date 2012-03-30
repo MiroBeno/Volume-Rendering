@@ -244,7 +244,7 @@ void motion_callback(int x, int y) {
 	mouse_state.y = y;
 }
 
-void reshape_callback(int w, int h) {
+void reshape_callback(int w, int h) {					//opravit pri minimalizovani okna: nonpositive size not allowed 
 	//printf("Resizing main window...\n");
 	if (window_size.x != w || window_size.y != h) {
 		window_size.x = w;

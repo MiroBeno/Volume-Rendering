@@ -2,6 +2,7 @@
 #define _MODEL_H_
 
 #include "data_utils.h"
+#include "ddsbase.h"
 
 struct Volume_model {
 	unsigned char *data;		//vyhodit

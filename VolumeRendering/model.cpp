@@ -30,8 +30,9 @@ int load_file(const char *file_name, unsigned char **result, size_t *file_size) 
 }
 
 int load_model(const char* file_name) {
-	int result = load_file(file_name, &volume.data, &volume.size);
-	if (volume.size == 0 || result != 0) 
+	//int result = load_file(file_name, &volume.data, &volume.size);
+	volume.data = readRAWfile(file_name, &volume.size);
+	if (volume.data == NULL) 
 		return -1;
 	printf("File loaded: %s. Size: %u B.\n", file_name, volume.size);
 //	volume.dims = make_int3(32, 32, 32);
