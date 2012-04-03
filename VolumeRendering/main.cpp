@@ -21,7 +21,7 @@ const char *FILE_NAME = "VisMale.raw";						// 128x256x256 x 8bit
 //const char *FILE_NAME = "XMasTree.raw";					// 512x499x512 x 8bit
 
 static int window_id, subwindow_id;
-static int2 window_size = {WIN_WIDTH, WIN_HEIGHT};
+static int2 window_size = {INT_WIN_WIDTH, INT_WIN_HEIGHT};
 static bool window_resize_flag = false;
 static GLuint pbo_gl_id = NULL;
 
@@ -38,9 +38,9 @@ char title_string[256];
 char append_string[256];
 
 extern float render_volume_gpu(uchar4 *buffer, Raycaster *current_raycaster);
-extern void init_gpu(Volume_model volume, int2 window_size);
+extern void set_volume_gpu(Volume_model volume);
 extern void set_transfer_fn_gpu(float4 *transfer_fn);
-extern void resize_gpu(int2 window_size);
+extern void set_window_size_gpu(int2 window_size);
 extern void free_gpu();
 
 extern float render_volume_gpu2(uchar4 *buffer, Raycaster *current_raycaster);
@@ -48,12 +48,12 @@ extern float render_volume_gpu3(uchar4 *buffer, Raycaster *current_raycaster);
 extern void set_transfer_fn_gpu23(float4 *transfer_fn);
 
 extern float render_volume_gpu4(uchar4 *buffer, Raycaster *current_raycaster);
-extern void init_gpu4(Volume_model volume);
+extern void set_volume_gpu4(Volume_model volume);
 extern void set_transfer_fn_gpu4(float4 *transfer_fn);
 extern void free_gpu4();
 
 extern float render_volume_cpu(uchar4 *buffer, Raycaster *current_raycaster);
-extern void set_transfer_fn_cpu(float4 *transfer_fn);
+extern void set_transfer_fn_cpu(float4 *current_transfer_fn);
 
 void reset_PBO() {
 	printf("Setting PBO...\n");
@@ -95,7 +95,7 @@ void draw_volume() {
 	glutSetWindow(window_id);
 	if (window_resize_flag) {
 		reset_PBO();
-		resize_gpu(window_size);
+		set_window_size_gpu(window_size);
 		set_window_size(window_size);
 		window_resize_flag = false;
 	}
@@ -141,8 +141,8 @@ void keyboard_callback(unsigned char key, int x, int y) {
 	}
 	if (key=='y') {
 		GLubyte *pbo_array = (GLubyte *)prepare_PBO();
-		for(int i = 0; i < WIN_WIDTH * WIN_HEIGHT; i++) {
-				*pbo_array++ = (i / WIN_WIDTH) % 256;
+		for(int i = 0; i < INT_WIN_WIDTH * INT_WIN_HEIGHT; i++) {
+				*pbo_array++ = (i / INT_WIN_WIDTH) % 256;
 				*pbo_array++ = i % 256;
 				*pbo_array++ = rand() % 256;
 				*pbo_array++ = 255;
@@ -244,36 +244,41 @@ void motion_callback(int x, int y) {
 	mouse_state.y = y;
 }
 
-void reshape_callback(int w, int h) {					//opravit pri minimalizovani okna: nonpositive size not allowed 
-	//printf("Resizing main window...\n");
+void reshape_callback(int w, int h) {				
+	//printf("Resizing main window... %i %i\n", w, h);
 	if (window_size.x != w || window_size.y != h) {
 		window_size.x = w;
 		window_size.y = h;
 		window_resize_flag = true;
 	}
-	glutSetWindow(subwindow_id);
-	glutPositionWindow(window_size.x/20, (window_size.y/20)*17);
-	glutReshapeWindow((window_size.x*18)/20, window_size.y/10);
-	glutSetWindow(window_id);
+	if (window_size.x != 0 && window_size.y != 0) {
+		glutSetWindow(subwindow_id);
+		glutPositionWindow(window_size.x/20, (window_size.y/20)*17);
+		glutReshapeWindow((window_size.x*18)/20, window_size.y/10);
+		glutSetWindow(window_id);
+	}
 }
 
 void display_callback_sub(void) {
 	//printf("Drawing subwindow...\n");
+	/**///cudaEventRecord(start, 0);
 	glClear(GL_COLOR_BUFFER_BIT);	
 	glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	float4 *transfer_fn = get_transfer_fn();
-	for (int i=0; i < 255; i++) {
-		glBegin(GL_POLYGON);
+	glBegin(GL_QUAD_STRIP);
+	for (int i=0; i <= 255; i++) {
 		glColor4f(transfer_fn[i].x, transfer_fn[i].y, transfer_fn[i].z, 1.0f);
 		glVertex2f(i, 0);
 		glVertex2f(i, transfer_fn[i].w);
-		glColor4f(transfer_fn[i+1].x, transfer_fn[i+1].y, transfer_fn[i+1].z, 1.0f);
-		glVertex2f(i+1, transfer_fn[i+1].w);
-		glVertex2f(i+1, 0);
-		glEnd();
 	}
+	glEnd();
 	glDisable(GL_BLEND);
+	/*cudaEventRecord(stop, 0);
+	cudaEventSynchronize(stop);
+	cudaEventElapsedTime(&elapsed_time, start, stop);
+	printf("sub: %f\n", elapsed_time);*/
+	glutSwapBuffers();
 }
 
 void motion_callback_sub(int x, int y) {
@@ -311,7 +316,7 @@ int main(int argc, char **argv) {
 	}
 
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);		//GLUT_DOUBLE
+	glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);		//GLUT_DOUBLE | GLUT_MULTISAMPLE
 	glutInitWindowSize(window_size.x, window_size.y);
 	glutInitWindowPosition(100,1);
 	window_id = glutCreateWindow(APP_NAME);
@@ -322,10 +327,10 @@ int main(int argc, char **argv) {
 	glutTimerFunc(timer_msecs, timer_callback, 0);
 	glutReshapeFunc(reshape_callback);
 
-	subwindow_id = glutCreateSubWindow(window_id, window_size.x/20, (window_size.y/20)*17, 256, 1);
+	subwindow_id = glutCreateSubWindow(window_id, window_size.x/20, (window_size.y/20)*17, 255, 1);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	glOrtho (0, 256, 0, 1, 0, 1);
+	glOrtho (0, 255, 0, 1, 0, 1);
 	glMatrixMode (GL_MODELVIEW);
 	glDisable(GL_DEPTH_TEST);
 	glClearColor(0.75f, 0.75f, 0.75f, 0.75f);
@@ -363,14 +368,15 @@ int main(int argc, char **argv) {
 
 	reset_PBO();
 	set_raycaster_model(get_model());
-	init_gpu(get_model(), window_size);
-	init_gpu4(get_model());
+	set_volume_gpu(get_model());
+	set_window_size_gpu(window_size);
+	set_volume_gpu4(get_model());
 	set_transfer_fn_cpu(get_transfer_fn());
 	set_transfer_fn_gpu(get_transfer_fn());
 	set_transfer_fn_gpu23(get_transfer_fn());
 	set_transfer_fn_gpu4(get_transfer_fn());
 
-	printf("Raycaster data size: %i B\n",sizeof(Raycaster));
+	//printf("Raycaster data size: %i B\n",sizeof(Raycaster));
 	glutMainLoop();
-	return 1;
+	return EXIT_FAILURE;
 }

@@ -206,6 +206,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\Renderer.h"
+				>
+			</File>
+			<File
 				RelativePath=".\volume_cpu.cpp"
 				>
 			</File>

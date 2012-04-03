@@ -39,7 +39,7 @@ struct Raycaster {
 		return (k1 <= k2) ? make_float2(k1, k2) : make_float2(k2, k1); // skontroluj opacny vektor
 	}
 
-	__host__ __device__ float2 intersect(float3 pt, float3 dir) {
+	__host__ __device__ float2 intersect_old(float3 pt, float3 dir) {
 		float2 xRange = intersect_1D(pt.x, dir.x, model.min_bound.x, model.max_bound.x);
 		float2 yRange = intersect_1D(pt.y, dir.y, model.min_bound.y, model.max_bound.y);
 		float2 zRange = intersect_1D(pt.z, dir.z, model.min_bound.z, model.max_bound.z);
@@ -50,6 +50,15 @@ struct Raycaster {
 		if (zRange.y < k2) k2 = zRange.y;					
 		return make_float2(k1 > 0 ? k1 : 0, k2);	// ak x < 0 bod vzniku luca je vnutri kocky - zacneme nie vstupnym priesecnikom, ale bodom vzniku (k = 0)
 	}												// pri vypocte k mozu vzniknut artefakty, a hodnoty mozu byt mimo volume, mozno riesit k +-= 0.00001f; alebo clampovanim vysledku na stenu
+
+	__host__ __device__ bool intersect(float3 pt, float3 dir, float2 *k) {  // mozne odchylky pri vypocte => hodnoty k mimo volume; riesi sa clampovanim vysledku na stenu
+		float3 k1 = (model.min_bound - pt) / dir;			// ak je zlozka vektora rovnobezna s osou a teda so stenou kocky (dir == 0), tak
+		float3 k2 = (model.max_bound - pt) / dir;				// ak lezi bod v romedzi kocky v danej osi je vysledok (-oo; +oo), inak (-oo;-oo) alebo (+oo;+oo) 
+		k->x = MAXIMUM(MAXIMUM(MINIMUM(k1.x, k2.x), MINIMUM(k1.y, k2.y)),MINIMUM(k1.z, k2.z)); 
+		k->y = MINIMUM(MINIMUM(MAXIMUM(k1.x, k2.x), MAXIMUM(k1.y, k2.y)),MAXIMUM(k1.z, k2.z));
+		k->x = MAXIMUM(k->x, 0);							// ak x < 0 bod vzniku luca je vnutri kocky - zacneme nie vstupnym priesecnikom, ale bodom vzniku (k = 0)
+		return ((k->x < k->y) && (k->y > 0));				// nenulovy interval koeficientu k (existuje priesecnica) A vystupny bod lezi na luci	 
+	}	
 
 	__host__ __device__ void write_color(float4 color, int2 pos, uchar4 buffer[]) {
 		if (color.w <= ray_threshold)

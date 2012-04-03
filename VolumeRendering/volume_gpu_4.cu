@@ -42,10 +42,10 @@ __global__ void render_ray_gpu4(uchar4 dev_buffer[]) {
 
 	float4 color_acc = {0,0,0,0};
 	float3 origin, direction;
-	raycaster.view.get_ray(pos, &origin, &direction);
-	float2 k_range = raycaster.intersect(origin, direction);
+	float2 k_range;
+	raycaster.view.get_ray(pos, &origin, &direction); 
 
-	if ((k_range.x < k_range.y) && (k_range.y > 0)) {				// nenulovy interval koeficientu k (existuje priesecnica) A vystupny bod lezi na luci
+	if (raycaster.intersect(origin, direction, &k_range)) {			
 		for (float k = k_range.x; k <= k_range.y; k += raycaster.ray_step) {		
 			float3 pt = origin + (direction * k);
 			float4 color_cur = sample_color_texture(pt);
@@ -74,7 +74,7 @@ extern void set_transfer_fn_gpu4(float4 *transfer_fn) {
 	}
 }
 
-extern void init_gpu4(Volume_model volume) {
+extern void set_volume_gpu4(Volume_model volume) {
 	cudaExtent volumeDims = {volume.dims.x, volume.dims.y, volume.dims.z};	
 	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<unsigned char>();	
 	cudaMalloc3DArray(&volume_array, &channelDesc, volumeDims);

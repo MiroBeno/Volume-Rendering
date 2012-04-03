@@ -8,12 +8,12 @@
 #include "cuda_runtime_api.h"
 
 dim3 THREADS_PER_BLOCK(16, 16);				// pocet threadov v bloku - podla occupancy calculator
-dim3 num_blocks;
+dim3 num_blocks(0, 0);
 
-uchar4 *dev_buffer;
-int dev_buffer_size;
-unsigned char *dev_volume_data;
-float4 *dev_transfer_fn;
+uchar4 *dev_buffer = NULL;
+int dev_buffer_size = 0;
+unsigned char *dev_volume_data = NULL;
+float4 *dev_transfer_fn = NULL;
 
 __global__ void render_ray_gpu(Raycaster raycaster, uchar4 dev_buffer[], unsigned char dev_volume_data[], float4 dev_transfer_fn[]) {
 	int2 pos = {blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y};
@@ -22,10 +22,10 @@ __global__ void render_ray_gpu(Raycaster raycaster, uchar4 dev_buffer[], unsigne
 
 	float4 color_acc = {0,0,0,0};
 	float3 origin, direction;
-	raycaster.view.get_ray(pos, &origin, &direction);
-	float2 k_range = raycaster.intersect(origin, direction);
+	float2 k_range;
+	raycaster.view.get_ray(pos, &origin, &direction); 
 
-	if ((k_range.x < k_range.y) && (k_range.y > 0)) {				// nenulovy interval koeficientu k (existuje priesecnica) A vystupny bod lezi na luci
+	if (raycaster.intersect(origin, direction, &k_range)) {				
 		for (float k = k_range.x; k <= k_range.y; k += raycaster.ray_step) {		
 			float3 pt = origin + (direction * k);
 			float4 color_cur = raycaster.sample_color(dev_volume_data, dev_transfer_fn, pt);
@@ -43,7 +43,7 @@ extern void set_transfer_fn_gpu(float4 *transfer_fn) {
 	cudaMemcpy(dev_transfer_fn, transfer_fn, 256 * sizeof(float4), cudaMemcpyHostToDevice);
 }
 
-extern void resize_gpu(int2 window_size) {
+extern void set_window_size_gpu(int2 window_size) {
 	if (dev_buffer != NULL)
 		cudaFree(dev_buffer);
 	dev_buffer_size = window_size.x * window_size.y * 4;
@@ -53,10 +53,11 @@ extern void resize_gpu(int2 window_size) {
 			// celociselne delenie, ak su rozmery okna nedelitelne 16, spustaju sa bloky s nevyuzitimi threadmi
 }
 
-extern void init_gpu(Volume_model volume, int2 window_size) {
+extern void set_volume_gpu(Volume_model volume) {
+	if (dev_volume_data != NULL)
+		cudaFree(dev_volume_data);
 	cudaMalloc((void **)&dev_volume_data, volume.size);
 	cudaMemcpy(dev_volume_data, volume.data, volume.size, cudaMemcpyHostToDevice);
-	resize_gpu(window_size);
 }
 
 extern void free_gpu() {

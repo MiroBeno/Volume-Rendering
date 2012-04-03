@@ -24,10 +24,10 @@ __global__ void render_ray_gpu2(uchar4 dev_buffer[], unsigned char dev_volume_da
 
 	float4 color_acc = {0,0,0,0};
 	float3 origin, direction;
-	raycaster.view.get_ray(pos, &origin, &direction);
-	float2 k_range = raycaster.intersect(origin, direction);
+	float2 k_range;
+	raycaster.view.get_ray(pos, &origin, &direction); 
 
-	if ((k_range.x < k_range.y) && (k_range.y > 0)) {				// nenulovy interval koeficientu k (existuje priesecnica) A vystupny bod lezi na luci
+	if (raycaster.intersect(origin, direction, &k_range)) {				
 		for (float k = k_range.x; k <= k_range.y; k += raycaster.ray_step) {		
 			float3 pt = origin + (direction * k);
 			float4 color_cur = raycaster.sample_color(dev_volume_data, dev_transfer_fn, pt);

@@ -35,8 +35,6 @@ unsigned char *readPVMvolume(const char *filename,
                              unsigned char **parameter=NULL,
                              unsigned char **comment=NULL);
 
-int checkfile(const char *filename);
-
 unsigned char *quantize(unsigned char *volume,
                         unsigned int width,unsigned int height,unsigned int depth,
                         BOOLINT linear=FALSE,BOOLINT nofree=FALSE);

@@ -3,8 +3,8 @@
 
 #include "data_utils.h"
 
-#define WIN_WIDTH 1024
-#define WIN_HEIGHT 1024
+#define INT_WIN_WIDTH 1024
+#define INT_WIN_HEIGHT 1024
 
 struct View {
 	int2 size_px;

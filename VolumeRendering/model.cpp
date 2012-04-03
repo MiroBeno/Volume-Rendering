@@ -9,32 +9,14 @@ static Volume_model volume = {	NULL,
 								{1, 1, 1}			
 							};
 
-int load_file(const char *file_name, unsigned char **result, size_t *file_size) {
-	*file_size = 0;
-	FILE *f = fopen(file_name, "rb");
-	if (f == NULL) { 
-		*result = NULL;
-		return -1;				// chyba otvarania
-	} 
-	fseek(f, 0, SEEK_END);
-	*file_size = (size_t) ftell(f);
-	fseek(f, 0, SEEK_SET);
-	*result = (unsigned char *)malloc(*file_size);
-	if (*file_size != fread(*result, sizeof(unsigned char), *file_size, f)) 
-	{ 
-		free(*result);
-		return -2;				// chyba citania
-	} 
-	fclose(f);
-	return 0;
-}
+
 
 int load_model(const char* file_name) {
-	//int result = load_file(file_name, &volume.data, &volume.size);
 	volume.data = readRAWfile(file_name, &volume.size);
 	if (volume.data == NULL) 
-		return -1;
+		return 1;
 	printf("File loaded: %s. Size: %u B.\n", file_name, volume.size);
+	// skontrolovat dims -> inak zla alokacia
 //	volume.dims = make_int3(32, 32, 32);
 //	volume.dims = make_int3(256, 256, 256);
 	volume.dims = make_int3(128, 256, 256);

@@ -7,15 +7,15 @@ static float2 cam_angles = {0, 0};			// x - horizontalny uhol, y - vertikalny uh
 static float cam_distance = 2;
 static float3 cam_position = {2, 0, 0};
 
-static float cam_pixel_delta = 180.0f / (MINIMUM(WIN_WIDTH, WIN_HEIGHT));
+static float cam_pixel_delta = 180.0f / (MINIMUM(INT_WIN_WIDTH, INT_WIN_HEIGHT));
 static float virtual_view_size = 3.0f;		// velkost virtualneho okna v priestore
 
-static View view = {	{WIN_WIDTH, WIN_HEIGHT}, 
-						{WIN_WIDTH / 2, WIN_HEIGHT / 2}, 
+static View view = {	{INT_WIN_WIDTH, INT_WIN_HEIGHT}, 
+						{INT_WIN_WIDTH / 2, INT_WIN_HEIGHT / 2}, 
 						{2, 0, 0},
 						{-1, 0, 0},
-						make_float3(0, 0, -1) * (3.0f / MINIMUM(WIN_WIDTH, WIN_HEIGHT)),
-						make_float3(0, 1, 0) * (3.0f / MINIMUM(WIN_WIDTH, WIN_HEIGHT)),
+						make_float3(0, 0, -1) * (3.0f / MINIMUM(INT_WIN_WIDTH, INT_WIN_HEIGHT)),
+						make_float3(0, 1, 0) * (3.0f / MINIMUM(INT_WIN_WIDTH, INT_WIN_HEIGHT)),
 						false
 					 };
 
