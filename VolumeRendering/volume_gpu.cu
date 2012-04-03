@@ -1,21 +1,26 @@
 // Standard CUDA implementation
 
-#include "data_utils.h"
-#include "projection.h"
-#include "model.h"
-#include "raycaster.h"
+#include "Renderer.h"
 
 #include "cuda_runtime_api.h"
 
-dim3 THREADS_PER_BLOCK(16, 16);				// pocet threadov v bloku - podla occupancy calculator
-dim3 num_blocks(0, 0);
+uchar4 *GPURenderer::dev_buffer = NULL;
+int GPURenderer::dev_buffer_size = 0;
+unsigned char *GPURenderer::dev_volume_data = NULL;
+dim3 GPURenderer::THREADS_PER_BLOCK(16, 16);				// pocet threadov v bloku - podla occupancy calculator
+dim3 GPURenderer::num_blocks(0, 0);
 
-uchar4 *dev_buffer = NULL;
-int dev_buffer_size = 0;
-unsigned char *dev_volume_data = NULL;
-float4 *dev_transfer_fn = NULL;
+GPURenderer1::GPURenderer1() {
+	dev_transfer_fn = NULL;
+}
 
-__global__ void render_ray_gpu(Raycaster raycaster, uchar4 dev_buffer[], unsigned char dev_volume_data[], float4 dev_transfer_fn[]) {
+GPURenderer1::~GPURenderer1() {
+	cudaFree(dev_buffer);
+	cudaFree(dev_volume_data);
+	cudaFree(dev_transfer_fn);
+}
+
+__global__ void render_ray(Raycaster raycaster, uchar4 dev_buffer[], unsigned char dev_volume_data[], float4 dev_transfer_fn[]) {
 	int2 pos = {blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y};
 	if ((pos.x >= raycaster.view.size_px.x) || (pos.y >= raycaster.view.size_px.y))	// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
 		return;
@@ -37,13 +42,13 @@ __global__ void render_ray_gpu(Raycaster raycaster, uchar4 dev_buffer[], unsigne
 	raycaster.write_color(color_acc, pos, dev_buffer);
 }
 
-extern void set_transfer_fn_gpu(float4 *transfer_fn) {
+void GPURenderer1::set_transfer_fn(float4 *transfer_fn) {
 	if (dev_transfer_fn == NULL)
 		cudaMalloc((void **)&dev_transfer_fn, 256 * sizeof(float4));
 	cudaMemcpy(dev_transfer_fn, transfer_fn, 256 * sizeof(float4), cudaMemcpyHostToDevice);
 }
 
-extern void set_window_size_gpu(int2 window_size) {
+void GPURenderer1::set_window_size(int2 window_size) {
 	if (dev_buffer != NULL)
 		cudaFree(dev_buffer);
 	dev_buffer_size = window_size.x * window_size.y * 4;
@@ -53,21 +58,15 @@ extern void set_window_size_gpu(int2 window_size) {
 			// celociselne delenie, ak su rozmery okna nedelitelne 16, spustaju sa bloky s nevyuzitimi threadmi
 }
 
-extern void set_volume_gpu(Volume_model volume) {
+void GPURenderer1::set_volume(Volume_model volume) {
 	if (dev_volume_data != NULL)
 		cudaFree(dev_volume_data);
 	cudaMalloc((void **)&dev_volume_data, volume.size);
 	cudaMemcpy(dev_volume_data, volume.data, volume.size, cudaMemcpyHostToDevice);
 }
 
-extern void free_gpu() {
-	cudaFree(dev_buffer);
-	cudaFree(dev_volume_data);
-	cudaFree(dev_transfer_fn);
-}
-
-extern float render_volume_gpu(uchar4 *buffer, Raycaster *current_raycaster) {
-	render_ray_gpu<<<num_blocks, THREADS_PER_BLOCK>>>(*current_raycaster, dev_buffer, dev_volume_data, dev_transfer_fn);
+float GPURenderer1::render_volume(uchar4 *buffer, Raycaster *current_raycaster) {
+	render_ray<<<num_blocks, THREADS_PER_BLOCK>>>(*current_raycaster, dev_buffer, dev_volume_data, dev_transfer_fn);
 	cudaMemcpy(buffer, dev_buffer, dev_buffer_size, cudaMemcpyDeviceToHost);
 	return 0;
 }

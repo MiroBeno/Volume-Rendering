@@ -1,11 +1,6 @@
-#include "data_utils.h"
-#include "projection.h"
-#include "model.h"
-#include "raycaster.h"
+#include "Renderer.h"		
 
-static float4 *transfer_fn;			
-
-inline void render_ray_cpu(Raycaster raycaster, uchar4 buffer[], int2 pos) {
+inline void CPURenderer::render_ray(Raycaster raycaster, uchar4 buffer[], int2 pos) {
 	float4 color_acc = {0,0,0,0};
 	float3 origin, direction;
 	float2 k_range;
@@ -23,14 +18,14 @@ inline void render_ray_cpu(Raycaster raycaster, uchar4 buffer[], int2 pos) {
 	raycaster.write_color(color_acc, pos, buffer);
 }
 
-extern void set_transfer_fn_cpu(float4 *current_transfer_fn) {
-	transfer_fn = current_transfer_fn;
+void CPURenderer::set_transfer_fn(float4 *transfer_fn) {
+	this->transfer_fn = transfer_fn;
 }
 
-extern float render_volume_cpu(uchar4 *buffer, Raycaster *current_raycaster) {
-	for(int row = 0; row < current_raycaster->view.size_px.y; row++)
-		for(int col = 0; col < current_raycaster->view.size_px.x; col++)	{
-			render_ray_cpu(*current_raycaster, buffer, make_int2(col, row));
+float CPURenderer::render_volume(uchar4 *buffer, Raycaster *raycaster) {
+	for(int row = 0; row < raycaster->view.size_px.y; row++)
+		for(int col = 0; col < raycaster->view.size_px.x; col++)	{
+			render_ray(*raycaster, buffer, make_int2(col, row));
 		}
 	return 0;
 }

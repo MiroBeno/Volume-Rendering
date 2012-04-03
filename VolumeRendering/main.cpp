@@ -10,6 +10,8 @@
 #include "projection.h"
 #include "raycaster.h"
 
+#include "Renderer.h"
+
 #include "cuda_runtime_api.h"
 #include "cuda_gl_interop.h"
 
@@ -38,10 +40,6 @@ char title_string[256];
 char append_string[256];
 
 extern float render_volume_gpu(uchar4 *buffer, Raycaster *current_raycaster);
-extern void set_volume_gpu(Volume_model volume);
-extern void set_transfer_fn_gpu(float4 *transfer_fn);
-extern void set_window_size_gpu(int2 window_size);
-extern void free_gpu();
 
 extern float render_volume_gpu2(uchar4 *buffer, Raycaster *current_raycaster);
 extern float render_volume_gpu3(uchar4 *buffer, Raycaster *current_raycaster);
@@ -52,8 +50,7 @@ extern void set_volume_gpu4(Volume_model volume);
 extern void set_transfer_fn_gpu4(float4 *transfer_fn);
 extern void free_gpu4();
 
-extern float render_volume_cpu(uchar4 *buffer, Raycaster *current_raycaster);
-extern void set_transfer_fn_cpu(float4 *current_transfer_fn);
+static Renderer *renderers[5];
 
 void reset_PBO() {
 	printf("Setting PBO...\n");
@@ -95,7 +92,7 @@ void draw_volume() {
 	glutSetWindow(window_id);
 	if (window_resize_flag) {
 		reset_PBO();
-		set_window_size_gpu(window_size);
+		renderers[1]->set_window_size(window_size);
 		set_window_size(window_size);
 		window_resize_flag = false;
 	}
@@ -104,11 +101,11 @@ void draw_volume() {
 	cudaEventRecord(start, 0);
 	switch (renderer_id) {
 		case 1:
-			render_volume_cpu(pbo_array, get_raycaster());
+			renderers[0]->render_volume(pbo_array, get_raycaster());
 			sprintf(append_string, "CPU");
 			break;
 		case 2 :
-			render_volume_gpu(pbo_array, get_raycaster());
+			renderers[1]->render_volume(pbo_array, get_raycaster());
 			sprintf(append_string, "CUDA Straightforward");
 			break;
 		case 3 :
@@ -194,8 +191,9 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		cudaGraphicsUnregisterResource(pbo_cuda_id);
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 		glDeleteBuffersARB(1, &pbo_gl_id);
+		delete renderers[0];
 		free_gpu4();
-		free_gpu();
+		delete renderers[1];
 		cudaEventDestroy(start);
 		cudaEventDestroy(stop);
 		glutDestroyWindow(window_id);
@@ -295,8 +293,8 @@ void motion_callback_sub(int x, int y) {
 	mouse_state.x = x;
 	mouse_state.y = y;
 	glutPostRedisplay();
-	set_transfer_fn_cpu(transfer_fn);
-	set_transfer_fn_gpu(transfer_fn);
+	renderers[0]->set_transfer_fn(get_transfer_fn());
+	renderers[1]->set_transfer_fn(get_transfer_fn());
 	set_transfer_fn_gpu23(transfer_fn);
 	set_transfer_fn_gpu4(transfer_fn);
 }
@@ -367,14 +365,20 @@ int main(int argc, char **argv) {
 	cudaEventCreate(&stop);
 
 	reset_PBO();
+
+	renderers[0] = new CPURenderer();
+	renderers[1] = new GPURenderer1();
+
 	set_raycaster_model(get_model());
-	set_volume_gpu(get_model());
-	set_window_size_gpu(window_size);
-	set_volume_gpu4(get_model());
-	set_transfer_fn_cpu(get_transfer_fn());
-	set_transfer_fn_gpu(get_transfer_fn());
-	set_transfer_fn_gpu23(get_transfer_fn());
-	set_transfer_fn_gpu4(get_transfer_fn());
+	renderers[1]->set_volume(get_model());
+	renderers[1]->set_window_size(window_size);
+	//set_volume_gpu4(get_model());
+
+	renderers[0]->set_transfer_fn(get_transfer_fn());
+	renderers[1]->set_transfer_fn(get_transfer_fn());
+
+	//set_transfer_fn_gpu23(get_transfer_fn());
+	//set_transfer_fn_gpu4(get_transfer_fn());
 
 	//printf("Raycaster data size: %i B\n",sizeof(Raycaster));
 	glutMainLoop();

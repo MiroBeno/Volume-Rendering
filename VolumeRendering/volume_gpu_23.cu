@@ -7,15 +7,15 @@
 
 #include "cuda_runtime_api.h"
 
-extern dim3 THREADS_PER_BLOCK;
-extern dim3 num_blocks;
+dim3 THREADS_PER_BLOCK;
+dim3 num_blocks;
 
 static __constant__ Raycaster raycaster;
 static __constant__ float4 dev_transfer_fn[256];
 
-extern uchar4 *dev_buffer;
-extern int dev_buffer_size;
-extern unsigned char *dev_volume_data;
+uchar4 *dev_buffer;
+int dev_buffer_size;
+unsigned char *dev_volume_data;
 
 __global__ void render_ray_gpu2(uchar4 dev_buffer[], unsigned char dev_volume_data[]) {
 	int2 pos = {blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y};
