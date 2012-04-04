@@ -1,6 +1,14 @@
 #include "Renderer.h"		
 
-inline void CPURenderer::render_ray(Raycaster raycaster, uchar4 buffer[], int2 pos) {
+static float4 *transfer_fn;
+
+CPURenderer::CPURenderer(int2 size, float4 *tf, Volume_model volume) {
+	set_window_buffer(size);
+	set_transfer_fn(tf);
+	set_volume(volume);
+}
+
+inline void render_ray(Raycaster raycaster, uchar4 buffer[], int2 pos) {
 	float4 color_acc = {0,0,0,0};
 	float3 origin, direction;
 	float2 k_range;
@@ -18,14 +26,14 @@ inline void CPURenderer::render_ray(Raycaster raycaster, uchar4 buffer[], int2 p
 	raycaster.write_color(color_acc, pos, buffer);
 }
 
-void CPURenderer::set_transfer_fn(float4 *transfer_fn) {
-	this->transfer_fn = transfer_fn;
+void CPURenderer::set_transfer_fn(float4 *tf) {
+	transfer_fn = tf;
 }
 
-float CPURenderer::render_volume(uchar4 *buffer, Raycaster *raycaster) {
-	for(int row = 0; row < raycaster->view.size_px.y; row++)
-		for(int col = 0; col < raycaster->view.size_px.x; col++)	{
-			render_ray(*raycaster, buffer, make_int2(col, row));
+int CPURenderer::render_volume(uchar4 *buffer, Raycaster *r) {
+	for(int row = 0; row < r->view.size_px.y; row++)
+		for(int col = 0; col < r->view.size_px.x; col++)	{
+			render_ray(*r, buffer, make_int2(col, row));
 		}
 	return 0;
 }

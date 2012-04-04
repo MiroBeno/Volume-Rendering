@@ -17,6 +17,7 @@
 
 const char *APP_NAME = "Naive VR.";
 const int timer_msecs = 1;
+const int RENDERERS_COUNT = 5;
 //const char *FILE_NAME = "Bucky.raw";						// 32x32x32 x 8bit
 //const char *FILE_NAME = "Foot.raw";						// 256x256x256 x 8bit
 const char *FILE_NAME = "VisMale.raw";						// 128x256x256 x 8bit
@@ -30,27 +31,16 @@ static GLuint pbo_gl_id = NULL;
 static int gpu_id;
 static cudaGraphicsResource *pbo_cuda_id;
 
-static int renderer_id = 2;
 static int4 mouse_state = make_int4(0, 0, 0, GLUT_UP);
 static int2 auto_rotate_vector = {0, 0};
 
 cudaEvent_t start, stop; 
 float elapsed_time = 0;
 char title_string[256];
-char append_string[256];
 
-extern float render_volume_gpu(uchar4 *buffer, Raycaster *current_raycaster);
-
-extern float render_volume_gpu2(uchar4 *buffer, Raycaster *current_raycaster);
-extern float render_volume_gpu3(uchar4 *buffer, Raycaster *current_raycaster);
-extern void set_transfer_fn_gpu23(float4 *transfer_fn);
-
-extern float render_volume_gpu4(uchar4 *buffer, Raycaster *current_raycaster);
-extern void set_volume_gpu4(Volume_model volume);
-extern void set_transfer_fn_gpu4(float4 *transfer_fn);
-extern void free_gpu4();
-
-static Renderer *renderers[5];
+static int renderer_id = 1;
+static Renderer *renderers[RENDERERS_COUNT];
+static char renderer_names[RENDERERS_COUNT][256]= {"CPU", "CUDA Straightforward", "CUDA Constant Memory", "CUDA CM + GL interop", "CUDA CM + 3D Texture Memory + GL interop"};
 
 void reset_PBO() {
 	printf("Setting PBO...\n");
@@ -66,7 +56,7 @@ void reset_PBO() {
 }
 
 uchar4 *prepare_PBO() {							//GLubyte *
-	if (renderer_id <4) {
+	if (renderer_id < 3) {
 		return (uchar4 *) glMapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY_ARB);
 	}
 	else {
@@ -79,7 +69,7 @@ uchar4 *prepare_PBO() {							//GLubyte *
 }
 
 void finalize_PBO() {
-	if (renderer_id <4) {
+	if (renderer_id < 3) {
 		glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB);
 	}
 	else {
@@ -92,40 +82,20 @@ void draw_volume() {
 	glutSetWindow(window_id);
 	if (window_resize_flag) {
 		reset_PBO();
-		renderers[1]->set_window_size(window_size);
+		for (int i=0; i < RENDERERS_COUNT; i++)
+			renderers[i]->set_window_buffer(window_size);
 		set_window_size(window_size);
 		window_resize_flag = false;
 	}
 	set_raycaster_view(get_view());
 	uchar4 *pbo_array = prepare_PBO();
 	cudaEventRecord(start, 0);
-	switch (renderer_id) {
-		case 1:
-			renderers[0]->render_volume(pbo_array, get_raycaster());
-			sprintf(append_string, "CPU");
-			break;
-		case 2 :
-			renderers[1]->render_volume(pbo_array, get_raycaster());
-			sprintf(append_string, "CUDA Straightforward");
-			break;
-		case 3 :
-			render_volume_gpu2(pbo_array, get_raycaster());
-			sprintf(append_string, "CUDA Constant Memory");
-			break;
-		case 4 :
-			render_volume_gpu3(pbo_array, get_raycaster());
-			sprintf(append_string, "CUDA CM + GL interop");
-			break;
-		case 5 :
-			render_volume_gpu4(pbo_array, get_raycaster());
-			sprintf(append_string, "CUDA CM + 3D Texture Memory + GL interop");
-			break;
-	}
+	renderers[renderer_id]->render_volume(pbo_array, get_raycaster());
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&elapsed_time, start, stop);
 	finalize_PBO();
-	sprintf(title_string, "%s %s @ %3.4f ms", APP_NAME, append_string, elapsed_time);
+	sprintf(title_string, "%s %s @ %3.4f ms", APP_NAME, renderer_names[renderer_id], elapsed_time);
 	glutSetWindowTitle(title_string);
 	glutPostRedisplay();
 }
@@ -177,25 +147,24 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		case 'n': change_ray_threshold(0.05f, false); break;
 		case 'm': change_ray_threshold(-0.05f, false); break;
 		case '-': toggle_perspective(); break;
+		case '`': renderer_id = 0; break;
 		case '1': renderer_id = 1; break;
 		case '2': renderer_id = 2; break;
 		case '3': renderer_id = 3; break;
 		case '4': renderer_id = 4; break;
-		case '5': renderer_id = 5; break;
 		case '7': set_camera_position(2,45,45); break;
 		case '8': set_camera_position(2,135,225); break;
 		case '9': set_camera_position(2,225,225); break;
 		case '0': set_camera_position(2,0,0); break;
 	}
 	if (key==27) {
+		cudaEventDestroy(start);
+		cudaEventDestroy(stop);
 		cudaGraphicsUnregisterResource(pbo_cuda_id);
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 		glDeleteBuffersARB(1, &pbo_gl_id);
-		delete renderers[0];
-		free_gpu4();
-		delete renderers[1];
-		cudaEventDestroy(start);
-		cudaEventDestroy(stop);
+		for (int i = RENDERERS_COUNT - 1; i >=0 ; i--)
+			delete renderers[i];
 		glutDestroyWindow(window_id);
 		exit(0);
 	}
@@ -293,10 +262,8 @@ void motion_callback_sub(int x, int y) {
 	mouse_state.x = x;
 	mouse_state.y = y;
 	glutPostRedisplay();
-	renderers[0]->set_transfer_fn(get_transfer_fn());
-	renderers[1]->set_transfer_fn(get_transfer_fn());
-	set_transfer_fn_gpu23(transfer_fn);
-	set_transfer_fn_gpu4(transfer_fn);
+	for (int i=0; i < RENDERERS_COUNT; i++)
+		renderers[i]->set_transfer_fn(get_transfer_fn());
 }
 
 void mouse_callback_sub(int button, int state, int x, int y) {
@@ -366,19 +333,13 @@ int main(int argc, char **argv) {
 
 	reset_PBO();
 
-	renderers[0] = new CPURenderer();
-	renderers[1] = new GPURenderer1();
-
 	set_raycaster_model(get_model());
-	renderers[1]->set_volume(get_model());
-	renderers[1]->set_window_size(window_size);
-	//set_volume_gpu4(get_model());
 
-	renderers[0]->set_transfer_fn(get_transfer_fn());
-	renderers[1]->set_transfer_fn(get_transfer_fn());
-
-	//set_transfer_fn_gpu23(get_transfer_fn());
-	//set_transfer_fn_gpu4(get_transfer_fn());
+	renderers[0] = new CPURenderer(window_size, get_transfer_fn(), get_model());
+	renderers[1] = new GPURenderer1(window_size, get_transfer_fn(), get_model());
+	renderers[2] = new GPURenderer2(window_size, get_transfer_fn(), get_model());
+	renderers[3] = new GPURenderer3(window_size, get_transfer_fn(), get_model());
+	renderers[4] = new GPURenderer4(window_size, get_transfer_fn(), get_model());
 
 	//printf("Raycaster data size: %i B\n",sizeof(Raycaster));
 	glutMainLoop();
