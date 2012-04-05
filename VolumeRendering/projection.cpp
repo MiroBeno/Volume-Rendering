@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "projection.h"
 
+//dlzka najvacsej hrany je 2 a stred kvadra v [0,0,0]
 const float2 distance_limits = {0.1f, 10};
 
 static float2 cam_angles = {0, 0};			// x - horizontalny uhol, y - vertikalny uhol

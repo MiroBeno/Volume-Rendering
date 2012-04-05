@@ -3,8 +3,8 @@
 
 #include "data_utils.h"
 #include "projection.h"
-#include "model.h"
-#include "raycaster.h"
+#include "Model.h"
+#include "Raycaster.h"
 
 class Renderer {
 	public:
@@ -14,15 +14,16 @@ class Renderer {
 			};
 		virtual void set_transfer_fn(float4 *tf) {
 			};
-		virtual void set_volume(Volume_model volume) {
+		virtual void set_volume(Model volume, unsigned char *d) {
 			};
 		virtual int render_volume(uchar4 *buffer, Raycaster *r) = 0;
 };
 
 class CPURenderer: public Renderer {
 	public:
-		CPURenderer(int2 size, float4 *tf, Volume_model volume);
+		CPURenderer(int2 size, float4 *tf, Model volume, unsigned char *d);
 		virtual void set_transfer_fn(float4 *tf);
+		virtual void set_volume(Model volume, unsigned char *d);
 		virtual int render_volume(uchar4 *buffer, Raycaster *r);
 };
 
@@ -37,33 +38,33 @@ class GPURenderer: public Renderer {
 
 class GPURenderer1: public GPURenderer {
 	public:
-		GPURenderer1(int2 size, float4 *tf, Volume_model volume);
+		GPURenderer1(int2 size, float4 *tf, Model volume, unsigned char *d);
 		virtual ~GPURenderer1();
 		virtual void set_window_buffer(int2 size);
 		virtual void set_transfer_fn(float4 *tf);
-		virtual void set_volume(Volume_model volume);
+		virtual void set_volume(Model volume, unsigned char *d);
 		virtual int render_volume(uchar4 *buffer, Raycaster *r);
 };
 
 class GPURenderer2: public GPURenderer {
 	public:
-		GPURenderer2(int2 size, float4 *tf, Volume_model volume);
+		GPURenderer2(int2 size, float4 *tf, Model volume, unsigned char *d);
 		virtual void set_transfer_fn(float4 *tf);
 		virtual int render_volume(uchar4 *buffer, Raycaster *r);
 };
 
 class GPURenderer3: public GPURenderer {
 	public:
-		GPURenderer3(int2 size, float4 *tf, Volume_model volume);
+		GPURenderer3(int2 size, float4 *tf, Model volume, unsigned char *d);
 		virtual int render_volume(uchar4 *buffer, Raycaster *r);
 };
 
 class GPURenderer4: public GPURenderer {
 	public:
-		GPURenderer4(int2 size, float4 *tf, Volume_model volume);
+		GPURenderer4(int2 size, float4 *tf, Model volume, unsigned char *d);
 		virtual ~GPURenderer4();
 		virtual void set_transfer_fn(float4 *tf);
-		virtual void set_volume(Volume_model volume);
+		virtual void set_volume(Model volume, unsigned char *d);
 		virtual int render_volume(uchar4 *buffer, Raycaster *r);
 };
 

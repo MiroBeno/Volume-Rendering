@@ -1,11 +1,12 @@
 #include "Renderer.h"		
 
 static float4 *transfer_fn;
+unsigned char *data;
 
-CPURenderer::CPURenderer(int2 size, float4 *tf, Volume_model volume) {
+CPURenderer::CPURenderer(int2 size, float4 *tf, Model volume, unsigned char *d) {
 	set_window_buffer(size);
 	set_transfer_fn(tf);
-	set_volume(volume);
+	set_volume(volume, d);
 }
 
 inline void render_ray(Raycaster raycaster, uchar4 buffer[], int2 pos) {
@@ -17,7 +18,7 @@ inline void render_ray(Raycaster raycaster, uchar4 buffer[], int2 pos) {
 	if (raycaster.intersect(origin, direction, &k_range))	{			
 		for (float k = k_range.x; k <= k_range.y; k += raycaster.ray_step) {		
 			float3 pt = origin + (direction * k);
-			float4 color_cur = raycaster.sample_color(raycaster.model.data, transfer_fn, pt);
+			float4 color_cur = raycaster.sample_color(data, transfer_fn, pt);
 			color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
 			if (color_acc.w > raycaster.ray_threshold) 
 				break;
@@ -28,6 +29,10 @@ inline void render_ray(Raycaster raycaster, uchar4 buffer[], int2 pos) {
 
 void CPURenderer::set_transfer_fn(float4 *tf) {
 	transfer_fn = tf;
+}
+
+void CPURenderer::set_volume(Model volume, unsigned char *d) {
+	data = d;
 }
 
 int CPURenderer::render_volume(uchar4 *buffer, Raycaster *r) {

@@ -21,7 +21,7 @@
 
 inline void errormsg(const char *file,int line)
    {
-   fprintf(stderr,"fatal error in <%s> at line %d!\n",file,line);
+   fprintf(stderr,"Fatal error in <%s> at line %d!\n",file,line);
    exit(EXIT_FAILURE);
    }
 

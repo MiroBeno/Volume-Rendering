@@ -12,10 +12,10 @@ dim3 GPURenderer::num_blocks(0, 0);
 
 static float4 *transfer_fn = NULL;
 
-GPURenderer1::GPURenderer1(int2 size, float4 *tf, Volume_model volume) {
+GPURenderer1::GPURenderer1(int2 size, float4 *tf, Model volume, unsigned char *d) {
 	set_window_buffer(size);
 	set_transfer_fn(tf);
-	set_volume(volume);
+	set_volume(volume, d);
 }
 
 GPURenderer1::~GPURenderer1() {
@@ -62,11 +62,11 @@ void GPURenderer1::set_window_buffer(int2 size) {
 			// celociselne delenie, ak su rozmery okna nedelitelne 16, spustaju sa bloky s nevyuzitimi threadmi
 }
 
-void GPURenderer1::set_volume(Volume_model volume) {
+void GPURenderer1::set_volume(Model volume, unsigned char *d) {
 	if (dev_volume_data != NULL)
 		cudaFree(dev_volume_data);
 	cudaMalloc((void **)&dev_volume_data, volume.size);
-	cudaMemcpy(dev_volume_data, volume.data, volume.size, cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_volume_data, d, volume.size, cudaMemcpyHostToDevice);
 }
 
 int GPURenderer1::render_volume(uchar4 *buffer, Raycaster *r) {

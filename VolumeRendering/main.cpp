@@ -6,22 +6,23 @@
 #include "glew.h"
 #include "glut.h"
 
-#include "model.h"
+#include "Model.h"
 #include "projection.h"
 #include "raycaster.h"
 
 #include "Renderer.h"
+#include "Raycaster.h"
 
 #include "cuda_runtime_api.h"
 #include "cuda_gl_interop.h"
 
 const char *APP_NAME = "Naive VR.";
-const int timer_msecs = 1;
+const int TIMER_MSECS = 1;
 const int RENDERERS_COUNT = 5;
-//const char *FILE_NAME = "Bucky.raw";						// 32x32x32 x 8bit
-//const char *FILE_NAME = "Foot.raw";						// 256x256x256 x 8bit
-const char *FILE_NAME = "VisMale.raw";						// 128x256x256 x 8bit
-//const char *FILE_NAME = "XMasTree.raw";					// 512x499x512 x 8bit
+//const char *FILE_NAME = "Bucky.pvm";						// 32x32x32 x 8bit
+//const char *FILE_NAME = "Foot.pvm";						// 256x256x256 x 8bit
+const char *FILE_NAME = "VisMale.pvm";					// 128x256x256 x 8bit
+//const char *FILE_NAME = "Bonsai1.pvm";					// 512x512x182 x 16 bit
 
 static int window_id, subwindow_id;
 static int2 window_size = {INT_WIN_WIDTH, INT_WIN_HEIGHT};
@@ -41,6 +42,9 @@ char title_string[256];
 static int renderer_id = 1;
 static Renderer *renderers[RENDERERS_COUNT];
 static char renderer_names[RENDERERS_COUNT][256]= {"CPU", "CUDA Straightforward", "CUDA Constant Memory", "CUDA CM + GL interop", "CUDA CM + 3D Texture Memory + GL interop"};
+
+static RaycasterBase raycaster_base;
+static ModelBase model_base;
 
 void reset_PBO() {
 	printf("Setting PBO...\n");
@@ -87,15 +91,15 @@ void draw_volume() {
 		set_window_size(window_size);
 		window_resize_flag = false;
 	}
-	set_raycaster_view(get_view());
+	raycaster_base.raycaster.view = get_view();
 	uchar4 *pbo_array = prepare_PBO();
 	cudaEventRecord(start, 0);
-	renderers[renderer_id]->render_volume(pbo_array, get_raycaster());
+	renderers[renderer_id]->render_volume(pbo_array, &raycaster_base.raycaster);
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&elapsed_time, start, stop);
 	finalize_PBO();
-	sprintf(title_string, "%s %s @ %3.4f ms", APP_NAME, renderer_names[renderer_id], elapsed_time);
+	sprintf(title_string, "%s %s @ %.4f ms", APP_NAME, renderer_names[renderer_id], elapsed_time);
 	glutSetWindowTitle(title_string);
 	glutPostRedisplay();
 }
@@ -140,12 +144,12 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		case 'd': camera_right(5.0f); break;
 		case 'q': camera_zoom(0.1f); break;
 		case 'e': camera_zoom(-0.1f); break;
-		case 'o': change_ray_step(0.01f, false); break;
-		case 'p': change_ray_step(-0.01f, false); break;
-		case 'k': change_tf_offset(0.025f, false); break;
-		case 'l': change_tf_offset(-0.025f, false); break;
-		case 'n': change_ray_threshold(0.05f, false); break;
-		case 'm': change_ray_threshold(-0.05f, false); break;
+		case 'o': raycaster_base.change_ray_step(0.01f, false); break;
+		case 'p': raycaster_base.change_ray_step(-0.01f, false); break;
+		case 'k': raycaster_base.change_tf_offset(0.025f, false); break;
+		case 'l': raycaster_base.change_tf_offset(-0.025f, false); break;
+		case 'n': raycaster_base.change_ray_threshold(0.05f, false); break;
+		case 'm': raycaster_base.change_ray_threshold(-0.05f, false); break;
 		case '-': toggle_perspective(); break;
 		case '`': renderer_id = 0; break;
 		case '1': renderer_id = 1; break;
@@ -165,6 +169,7 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		glDeleteBuffersARB(1, &pbo_gl_id);
 		for (int i = RENDERERS_COUNT - 1; i >=0 ; i--)
 			delete renderers[i];
+		free(model_base.data);
 		glutDestroyWindow(window_id);
 		exit(0);
 	}
@@ -183,7 +188,7 @@ void timer_callback(int value) {
 	if (auto_rotate_vector.y != 0 && mouse_state.w == GLUT_UP) 
 		camera_down(auto_rotate_vector.y);
 	draw_volume();
-	glutTimerFunc(timer_msecs, timer_callback, 0);
+	glutTimerFunc(TIMER_MSECS, timer_callback, 0);
 }
 
 void mouse_callback(int button, int state, int x, int y) {
@@ -232,12 +237,19 @@ void display_callback_sub(void) {
 	glClear(GL_COLOR_BUFFER_BIT);	
 	glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	float4 *transfer_fn = get_transfer_fn();
+	float4 *transfer_fn = raycaster_base.transfer_fn;
 	glBegin(GL_QUAD_STRIP);
 	for (int i=0; i <= 255; i++) {
 		glColor4f(transfer_fn[i].x, transfer_fn[i].y, transfer_fn[i].z, 1.0f);
 		glVertex2f(i, 0);
 		glVertex2f(i, transfer_fn[i].w);
+	}
+	glEnd();
+	glBegin(GL_QUAD_STRIP);
+	for (int i=0; i <= 255; i++) {
+		glColor4f(1, 1, 1, 0.5f);
+		glVertex2f(i, 0);
+		glVertex2f(i, model_base.histogram[i]);
 	}
 	glEnd();
 	glDisable(GL_BLEND);
@@ -249,21 +261,25 @@ void display_callback_sub(void) {
 }
 
 void motion_callback_sub(int x, int y) {
-	float4 *transfer_fn = get_transfer_fn();
+	float4 *transfer_fn = raycaster_base.transfer_fn;
 	float win_width = (float)glutGet(GLUT_WINDOW_WIDTH), win_height = (float)glutGet(GLUT_WINDOW_HEIGHT);
 	int steps = abs(x - mouse_state.x);
 	int x_delta = mouse_state.x < x ? 1 : -1;
 	float y_delta = (steps == 0) ? 0 : (y - mouse_state.y) / (float)steps;
 	for (int i = 0; i <= steps; i++) {
 		int sample = CLAMP((int)((mouse_state.x + i * x_delta) / (win_width / 256)), 0, 255);
-		float intensity = CLAMP(1.0f - (mouse_state.y + i * y_delta) / win_height, 0, 1.0f);
+		float intensity;
+		if (mouse_state.z == GLUT_LEFT_BUTTON) 
+			intensity = CLAMP(1.0f - (mouse_state.y + i * y_delta) / win_height, 0, 1.0f);
+		if (mouse_state.z != GLUT_LEFT_BUTTON) 
+			intensity = 0;
 		transfer_fn[sample].w = intensity;
 	}
 	mouse_state.x = x;
 	mouse_state.y = y;
 	glutPostRedisplay();
 	for (int i=0; i < RENDERERS_COUNT; i++)
-		renderers[i]->set_transfer_fn(get_transfer_fn());
+		renderers[i]->set_transfer_fn(raycaster_base.transfer_fn);
 }
 
 void mouse_callback_sub(int button, int state, int x, int y) {
@@ -275,21 +291,22 @@ void mouse_callback_sub(int button, int state, int x, int y) {
 
 int main(int argc, char **argv) {
 
-	if (load_model(FILE_NAME) != 0) {
+	if (model_base.load_model(FILE_NAME) != 0) {
 		fprintf(stderr, "File error: %s\n", FILE_NAME);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);		//GLUT_DOUBLE | GLUT_MULTISAMPLE
 	glutInitWindowSize(window_size.x, window_size.y);
 	glutInitWindowPosition(100,1);
+
 	window_id = glutCreateWindow(APP_NAME);
 	glutDisplayFunc(display_callback);
 	glutKeyboardFunc(keyboard_callback);
 	glutMouseFunc(mouse_callback);
     glutMotionFunc(motion_callback);
-	glutTimerFunc(timer_msecs, timer_callback, 0);
+	glutTimerFunc(1, timer_callback, 0);
 	glutReshapeFunc(reshape_callback);
 
 	subwindow_id = glutCreateSubWindow(window_id, window_size.x/20, (window_size.y/20)*17, 255, 1);
@@ -298,7 +315,7 @@ int main(int argc, char **argv) {
 	glOrtho (0, 255, 0, 1, 0, 1);
 	glMatrixMode (GL_MODELVIEW);
 	glDisable(GL_DEPTH_TEST);
-	glClearColor(0.75f, 0.75f, 0.75f, 0.75f);
+	glClearColor(0.75f, 0.75f, 0.75f, 1);
 	glutDisplayFunc(display_callback_sub);
 	glutMouseFunc(mouse_callback_sub);
 	glutMotionFunc(motion_callback_sub);
@@ -317,7 +334,7 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
-	printf("Use '12345' to change renderer\n    'wasd' and '7890' to manipulate camera position\n");
+	printf("Use '`1234' to change renderer\n    'wasd' and '7890' to manipulate camera position\n");
 	printf("    'op' to change ray sampling rate\n    'kl' to change transfer function offset\n");
 	printf("    'nm' to change ray accumulation threshold\n    'r' to toggle autorotation\n");
 	printf("    '-' to toggle perspective and orthogonal projection\n\n");
@@ -333,13 +350,20 @@ int main(int argc, char **argv) {
 
 	reset_PBO();
 
-	set_raycaster_model(get_model());
+	raycaster_base.set_volume(model_base.volume);
 
-	renderers[0] = new CPURenderer(window_size, get_transfer_fn(), get_model());
-	renderers[1] = new GPURenderer1(window_size, get_transfer_fn(), get_model());
-	renderers[2] = new GPURenderer2(window_size, get_transfer_fn(), get_model());
-	renderers[3] = new GPURenderer3(window_size, get_transfer_fn(), get_model());
-	renderers[4] = new GPURenderer4(window_size, get_transfer_fn(), get_model());
+	for (int i =0; i < 256; i++) {
+		raycaster_base.transfer_fn[i] = make_float4(i <= 85 ? (i*3)/255.0f : 0.0f, 
+										(i > 85) && (i <= 170) ? ((i-85)*3)/255.0f : 0.0f, 
+										i > 170 ? ((i-170)*3)/255.0f : 0.0f, 
+										i/255.0f);
+	}
+
+	renderers[0] = new CPURenderer(window_size, raycaster_base.transfer_fn, model_base.volume, model_base.data);
+	renderers[1] = new GPURenderer1(window_size, raycaster_base.transfer_fn, model_base.volume, model_base.data);
+	renderers[2] = new GPURenderer2(window_size, raycaster_base.transfer_fn, model_base.volume, model_base.data);
+	renderers[3] = new GPURenderer3(window_size, raycaster_base.transfer_fn, model_base.volume, model_base.data);
+	renderers[4] = new GPURenderer4(window_size, raycaster_base.transfer_fn, model_base.volume, model_base.data);
 
 	//printf("Raycaster data size: %i B\n",sizeof(Raycaster));
 	glutMainLoop();

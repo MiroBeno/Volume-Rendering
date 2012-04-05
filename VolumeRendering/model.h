@@ -4,12 +4,10 @@
 #include "data_utils.h"
 #include "ddsbase.h"
 
-struct Volume_model {
-	unsigned char *data;		//vyhodit
+struct Model {
 	unsigned int size;
-	int3 dims;		
-	float3 min_bound;
-	float3 max_bound;
+	uint3 dims;		
+	float3 bound;
 
 	__host__ __device__ unsigned char sample_data(unsigned char volume_data[], float3 pos) {
 		return volume_data[
@@ -20,8 +18,12 @@ struct Volume_model {
 	}
 };
 
-int load_model(const char* file_name);
-
-Volume_model get_model();
+class ModelBase {
+	public:
+		static Model volume;
+		static unsigned char *data;
+		static float histogram[256];
+		static int load_model(const char* file_name);
+};
 
 #endif

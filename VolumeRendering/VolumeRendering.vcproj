@@ -186,7 +186,23 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath=".\CPURenderer.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\ddsbase.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\GPURenderer1.cu"
+				>
+			</File>
+			<File
+				RelativePath=".\GPURenderer23.cu"
+				>
+			</File>
+			<File
+				RelativePath=".\GPURenderer4.cu"
 				>
 			</File>
 			<File
@@ -194,7 +210,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\model.cpp"
+				RelativePath=".\ModelBase.cpp"
 				>
 			</File>
 			<File
@@ -202,27 +218,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\raycaster.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\Renderer.h"
-				>
-			</File>
-			<File
-				RelativePath=".\volume_cpu.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\volume_gpu.cu"
-				>
-			</File>
-			<File
-				RelativePath=".\volume_gpu_23.cu"
-				>
-			</File>
-			<File
-				RelativePath=".\volume_gpu_4.cu"
+				RelativePath=".\RaycasterBase.cpp"
 				>
 			</File>
 		</Filter>
@@ -240,7 +236,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\model.h"
+				RelativePath=".\Model.h"
 				>
 			</File>
 			<File
@@ -248,7 +244,11 @@
 				>
 			</File>
 			<File
-				RelativePath=".\raycaster.h"
+				RelativePath=".\Raycaster.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Renderer.h"
 				>
 			</File>
 		</Filter>

@@ -18,10 +18,10 @@ texture<unsigned char, 3, cudaReadModeNormalizedFloat> volume_texture;
 cudaArray *transfer_fn_array = 0;
 texture<float4, 1, cudaReadModeElementType> transfer_fn_texture;
 
-GPURenderer4::GPURenderer4(int2 size, float4 *tf, Volume_model volume) {
+GPURenderer4::GPURenderer4(int2 size, float4 *tf, Model volume, unsigned char *d) {
 	set_window_buffer(size);
 	set_transfer_fn(tf);
-	set_volume(volume);
+	set_volume(volume, d);
 }
 
 GPURenderer4::~GPURenderer4() {
@@ -69,7 +69,7 @@ void GPURenderer4::set_transfer_fn(float4 *tf) {
 		cudaMallocArray(&transfer_fn_array, &channelDesc, 256, 1); 
 		cudaMemcpyToArray(transfer_fn_array, 0, 0, tf, 256 * sizeof(float4), cudaMemcpyHostToDevice);
 
-		transfer_fn_texture.filterMode = cudaFilterModeLinear; //vypnut pri cm 
+		transfer_fn_texture.filterMode = cudaFilterModeLinear; 
 		transfer_fn_texture.normalized = true;
 		transfer_fn_texture.addressMode[0] = cudaAddressModeClamp; 
 		cudaBindTextureToArray(transfer_fn_texture, transfer_fn_array, channelDesc);
@@ -80,20 +80,20 @@ void GPURenderer4::set_transfer_fn(float4 *tf) {
 	}
 }
 
-void GPURenderer4::set_volume(Volume_model volume) {
+void GPURenderer4::set_volume(Model volume, unsigned char *d) {
 	cudaExtent volumeDims = {volume.dims.x, volume.dims.y, volume.dims.z};	
 	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<unsigned char>();	
 	cudaMalloc3DArray(&volume_array, &channelDesc, volumeDims);
 
     cudaMemcpy3DParms copyParams = {0};
-	copyParams.srcPtr   = make_cudaPitchedPtr(dev_volume_data, volumeDims.width*sizeof(unsigned char), volumeDims.width, volumeDims.height);
+	copyParams.srcPtr   = make_cudaPitchedPtr(d, volumeDims.width*sizeof(unsigned char), volumeDims.width, volumeDims.height);
     copyParams.dstArray = volume_array;
     copyParams.extent   = volumeDims;
-    copyParams.kind     = cudaMemcpyDeviceToDevice;				//!!z hosta
+    copyParams.kind     = cudaMemcpyHostToDevice;
     cudaMemcpy3D(&copyParams);
 
     volume_texture.normalized = true;                      
-    volume_texture.filterMode = cudaFilterModeLinear; //vypnut pri cm     
+    volume_texture.filterMode = cudaFilterModeLinear; //vypnut pri cm ?   
     volume_texture.addressMode[0] = cudaAddressModeClamp;  
     volume_texture.addressMode[1] = cudaAddressModeClamp;
     volume_texture.addressMode[2] = cudaAddressModeClamp;

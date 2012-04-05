@@ -7,16 +7,16 @@
 static __constant__ Raycaster raycaster;
 static __constant__ float4 transfer_fn[256];
 
-GPURenderer2::GPURenderer2(int2 size, float4 *tf, Volume_model volume) {
+GPURenderer2::GPURenderer2(int2 size, float4 *tf, Model volume, unsigned char *d) {
 	set_window_buffer(size);
 	set_transfer_fn(tf);
-	set_volume(volume);
+	set_volume(volume, d);
 }
 
-GPURenderer3::GPURenderer3(int2 size, float4 *tf, Volume_model volume) {
+GPURenderer3::GPURenderer3(int2 size, float4 *tf, Model volume, unsigned char *d) {
 	set_window_buffer(size);
 	set_transfer_fn(tf);
-	set_volume(volume);
+	set_volume(volume, d);
 }
 
 __global__ void render_ray(uchar4 dev_buffer[], unsigned char dev_volume_data[]) {
