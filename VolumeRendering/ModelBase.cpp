@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 #include "Model.h"
 
 Model ModelBase::volume = {	0,
@@ -11,19 +12,20 @@ Model ModelBase::volume = {	0,
 unsigned char *ModelBase::data;
 float ModelBase::histogram[256];
 
-void compute_histogram() {
+void ModelBase::compute_histogram() {
 	unsigned int int_histogram[256];
-	unsigned int max_value = 0;
-	for (int i = 0; i<256; i++) {
+	float max_value = 0;
+	for (int i = 0; i<256; i++) 
 		int_histogram[i] = 0;
-	}
-	for (unsigned int i = 0; i<ModelBase::volume.size; i++) {
-		if (++int_histogram[ModelBase::data[i]] > max_value )
-			max_value = int_histogram[ModelBase::data[i]];
-	}
+	for (unsigned int i = 0; i<volume.size; i++)
+		int_histogram[data[i]]++;
 	for (int i = 0; i<256; i++) {
-		ModelBase::histogram[i] = int_histogram[i] / (float)max_value;
+		histogram[i] = sqrt(sqrt((float)int_histogram[i]));
+		if (histogram[i] > max_value)
+			max_value = histogram[i];
 	}
+	for (int i = 0; i<256; i++) 
+		histogram[i] = histogram[i] / max_value;
 }
 
 int ModelBase::load_model(const char* file_name) {

@@ -10,7 +10,7 @@ CPURenderer::CPURenderer(int2 size, float4 *tf, Model volume, unsigned char *d) 
 }
 
 inline void render_ray(Raycaster raycaster, uchar4 buffer[], int2 pos) {
-	float4 color_acc = {0,0,0,0};
+	float4 color_acc = {0, 0, 0, 0};
 	float3 origin, direction;
 	float2 k_range;
 	raycaster.view.get_ray(pos, &origin, &direction); 

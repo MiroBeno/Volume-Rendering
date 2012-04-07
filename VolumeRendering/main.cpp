@@ -7,16 +7,14 @@
 #include "glut.h"
 
 #include "Model.h"
-#include "projection.h"
-#include "raycaster.h"
-
-#include "Renderer.h"
+#include "View.h"
 #include "Raycaster.h"
+#include "Renderer.h"
 
 #include "cuda_runtime_api.h"
 #include "cuda_gl_interop.h"
 
-const char *APP_NAME = "Naive VR.";
+const char *APP_NAME = "VR:";
 const int TIMER_MSECS = 1;
 const int RENDERERS_COUNT = 5;
 //const char *FILE_NAME = "Bucky.pvm";						// 32x32x32 x 8bit
@@ -28,35 +26,51 @@ static int window_id, subwindow_id;
 static int2 window_size = {INT_WIN_WIDTH, INT_WIN_HEIGHT};
 static bool window_resize_flag = false;
 static GLuint pbo_gl_id = NULL;
+static GLuint tex_gl_id = NULL;
 
 static int gpu_id;
 static cudaGraphicsResource *pbo_cuda_id;
 
+static bool use_texture_display = false;
 static int4 mouse_state = make_int4(0, 0, 0, GLUT_UP);
 static int2 auto_rotate_vector = {0, 0};
 
-cudaEvent_t start, stop; 
-float elapsed_time = 0;
+cudaEvent_t start, stop, frame; 
+float2 elapsed_time = {0, 0};
 char title_string[256];
 
 static int renderer_id = 1;
 static Renderer *renderers[RENDERERS_COUNT];
-static char renderer_names[RENDERERS_COUNT][256]= {"CPU", "CUDA Straightforward", "CUDA Constant Memory", "CUDA CM + GL interop", "CUDA CM + 3D Texture Memory + GL interop"};
+static char renderer_names[RENDERERS_COUNT][256]= {"CPU", "CUDA Straightforward", "CUDA Constant Memory", "CUDA CM + GL interop", "CUDA CM + 3D Texture Memory + GLI"};
 
 static RaycasterBase raycaster_base;
 static ModelBase model_base;
+static ViewBase view_base;
 
-void reset_PBO() {
+void reset_PBO(bool destroy) {
 	printf("Setting PBO...\n");
     if (pbo_gl_id != NULL) {
 		cudaGraphicsUnregisterResource(pbo_cuda_id);
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 		glDeleteBuffersARB(1, &pbo_gl_id);
+		//
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glDeleteTextures(1, &tex_gl_id);
+		//
     }
-	glGenBuffersARB(1, &pbo_gl_id);	
-	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_gl_id);
-	glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, window_size.x * window_size.y * 4, NULL, GL_DYNAMIC_DRAW_ARB);		//GL_STREAM_DRAW_ARB ??  // int CHANNEL_COUNT = 4;
-	cudaGraphicsGLRegisterBuffer(&pbo_cuda_id, pbo_gl_id, cudaGraphicsMapFlagsWriteDiscard);
+	if (!destroy) {
+		glGenBuffersARB(1, &pbo_gl_id);	
+		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_gl_id);
+		glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, window_size.x * window_size.y * 4, NULL, GL_STREAM_DRAW_ARB);		//GL_STREAM_DRAW_ARB|GL_DYNAMIC_DRAW_ARB ??  // int CHANNEL_COUNT = 4;
+		cudaGraphicsGLRegisterBuffer(&pbo_cuda_id, pbo_gl_id, cudaGraphicsMapFlagsWriteDiscard);
+		//
+		glGenTextures(1, &tex_gl_id);
+		glBindTexture(GL_TEXTURE_2D, tex_gl_id);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, window_size.x, window_size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		//
+	}
 }
 
 uchar4 *prepare_PBO() {							//GLubyte *
@@ -85,88 +99,86 @@ void draw_volume() {
 	//printf("Drawing volume...\n");
 	glutSetWindow(window_id);
 	if (window_resize_flag) {
-		reset_PBO();
+		reset_PBO(false);
+		glViewport(0, 0, window_size.x, window_size.y);
 		for (int i=0; i < RENDERERS_COUNT; i++)
 			renderers[i]->set_window_buffer(window_size);
-		set_window_size(window_size);
+		view_base.set_window_size(window_size);
 		window_resize_flag = false;
 	}
-	raycaster_base.raycaster.view = get_view();
+	raycaster_base.raycaster.view = view_base.view;
 	uchar4 *pbo_array = prepare_PBO();
-	cudaEventRecord(start, 0);
+	cudaEventRecord(start, 0);	
 	renderers[renderer_id]->render_volume(pbo_array, &raycaster_base.raycaster);
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);
-	cudaEventElapsedTime(&elapsed_time, start, stop);
+	cudaEventElapsedTime(&elapsed_time.x, start, stop);
+	cudaEventElapsedTime(&elapsed_time.y, frame, stop);
 	finalize_PBO();
-	sprintf(title_string, "%s %s @ %.4f ms", APP_NAME, renderer_names[renderer_id], elapsed_time);
+	sprintf(title_string, "%s %s @ %.2f ms / %.2f ms (%dx%d)", APP_NAME, renderer_names[renderer_id], elapsed_time.x, elapsed_time.y, window_size.x, window_size.y);
 	glutSetWindowTitle(title_string);
+	cudaEventRecord(frame, 0);
 	glutPostRedisplay();
 }
 
 void keyboard_callback(unsigned char key, int x, int y) {
-	if (key=='t') {
-		glClearColor(1,0,0,1);
-		glClear(GL_COLOR_BUFFER_BIT);
-		glutWireTeapot(0.5);
-	}
-	if (key=='y') {
-		GLubyte *pbo_array = (GLubyte *)prepare_PBO();
-		for(int i = 0; i < INT_WIN_WIDTH * INT_WIN_HEIGHT; i++) {
-				*pbo_array++ = (i / INT_WIN_WIDTH) % 256;
-				*pbo_array++ = i % 256;
-				*pbo_array++ = rand() % 256;
-				*pbo_array++ = 255;
-			}
-		finalize_PBO();
-		glutPostRedisplay();
-	}
-	if (key=='b') {
-		glutSwapBuffers();
-	}
-	if (key=='v') {
-		draw_volume();
-	}
-	if (key=='r') {
-		if (auto_rotate_vector.x == 0 && auto_rotate_vector.y == 0) {
-			auto_rotate_vector = make_int2(-5, -5);
-			printf("Autorotation: on\n");
-		}
-		else {
-			auto_rotate_vector = make_int2(0, 0);
-			printf("Autorotation: off\n");
-		}
-	}
 	switch (key) {
-		case 'w': camera_down(-5.0f); break;
-		case 's': camera_down(5.0f); break;
-		case 'a': camera_right(-5.0f); break;
-		case 'd': camera_right(5.0f); break;
-		case 'q': camera_zoom(0.1f); break;
-		case 'e': camera_zoom(-0.1f); break;
+		case 'w': view_base.camera_down(-5.0f); break;
+		case 's': view_base.camera_down(5.0f); break;
+		case 'a': view_base.camera_right(-5.0f); break;
+		case 'd': view_base.camera_right(5.0f); break;
+		case 'q': view_base.camera_zoom(0.1f); break;
+		case 'e': view_base.camera_zoom(-0.1f); break;
 		case 'o': raycaster_base.change_ray_step(0.01f, false); break;
 		case 'p': raycaster_base.change_ray_step(-0.01f, false); break;
 		case 'k': raycaster_base.change_tf_offset(0.025f, false); break;
 		case 'l': raycaster_base.change_tf_offset(-0.025f, false); break;
 		case 'n': raycaster_base.change_ray_threshold(0.05f, false); break;
 		case 'm': raycaster_base.change_ray_threshold(-0.05f, false); break;
-		case '-': toggle_perspective(); break;
+		case '-': view_base.toggle_perspective(); break;
 		case '`': renderer_id = 0; break;
 		case '1': renderer_id = 1; break;
 		case '2': renderer_id = 2; break;
 		case '3': renderer_id = 3; break;
 		case '4': renderer_id = 4; break;
-		case '7': set_camera_position(2,45,45); break;
-		case '8': set_camera_position(2,135,225); break;
-		case '9': set_camera_position(2,225,225); break;
-		case '0': set_camera_position(2,0,0); break;
+		case '7': view_base.set_camera_position(2,45,45); break;
+		case '8': view_base.set_camera_position(2,135,225); break;
+		case '9': view_base.set_camera_position(2,225,225); break;
+		case '0': view_base.set_camera_position(2,0,0); break;
+		case 'r':	if (auto_rotate_vector.x == 0 && auto_rotate_vector.y == 0) {
+						auto_rotate_vector = make_int2(-5, -5);
+						printf("Autorotation: on\n");
+					}
+					else {
+						auto_rotate_vector = make_int2(0, 0);
+						printf("Autorotation: off\n");
+					}
+					break;
+		case 't':	use_texture_display = (!use_texture_display); 
+					printf("Texture display mode: %s\n", (use_texture_display)?"true":"false");
+					break;
+		case 'b': glutSwapBuffers(); break;
+		case 'v': draw_volume(); break;
+		case 'y':	glClearColor(1,0,0,1);
+					glClear(GL_COLOR_BUFFER_BIT);
+					glutWireTeapot(0.5);
+					break;
+		case 'u':	GLubyte *pbo_array = (GLubyte *)prepare_PBO();
+					for(int i = 0; i < INT_WIN_WIDTH * INT_WIN_HEIGHT; i++) {
+							*pbo_array++ = (i / INT_WIN_WIDTH) % 256;
+							*pbo_array++ = i % 256;
+							*pbo_array++ = rand() % 256;
+							*pbo_array++ = 255;
+						}
+					finalize_PBO();
+					glutPostRedisplay();
+					break;
 	}
 	if (key==27) {
 		cudaEventDestroy(start);
 		cudaEventDestroy(stop);
-		cudaGraphicsUnregisterResource(pbo_cuda_id);
-		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
-		glDeleteBuffersARB(1, &pbo_gl_id);
+		cudaEventDestroy(frame);
+		reset_PBO(true);
 		for (int i = RENDERERS_COUNT - 1; i >=0 ; i--)
 			delete renderers[i];
 		free(model_base.data);
@@ -177,16 +189,41 @@ void keyboard_callback(unsigned char key, int x, int y) {
 
 void display_callback(void) {
 	//printf("Main window display callback...\n");
-	glDrawPixels(window_size.x, window_size.y, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	if (!use_texture_display) {
+		glDisable(GL_TEXTURE_2D);
+		glDrawPixels(window_size.x, window_size.y, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	}
+	else {
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, window_size.x, window_size.y, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+		glEnable(GL_TEXTURE_2D);
+		glBegin(GL_QUADS);
+		glTexCoord2f(0, 0); glVertex2f(0, 0);
+		glTexCoord2f(1, 0); glVertex2f(1, 0);
+		glTexCoord2f(1, 1); glVertex2f(1, 1);
+		glTexCoord2f(0, 1); glVertex2f(0, 1);
+		glEnd();
+	}
+	glDisable(GL_BLEND);
 	glutSwapBuffers();
+}
+
+void idle_callback(){
+	if (auto_rotate_vector.x != 0 && mouse_state.w == GLUT_UP)
+		view_base.camera_right(auto_rotate_vector.x);
+	if (auto_rotate_vector.y != 0 && mouse_state.w == GLUT_UP) 
+		view_base.camera_down(auto_rotate_vector.y);
+    draw_volume();
 }
 
 void timer_callback(int value) {
 	//printf("Timer ticked...\n");
 	if (auto_rotate_vector.x != 0 && mouse_state.w == GLUT_UP)
-		camera_right(auto_rotate_vector.x);
+		view_base.camera_right(auto_rotate_vector.x);
 	if (auto_rotate_vector.y != 0 && mouse_state.w == GLUT_UP) 
-		camera_down(auto_rotate_vector.y);
+		view_base.camera_down(auto_rotate_vector.y);
 	draw_volume();
 	glutTimerFunc(TIMER_MSECS, timer_callback, 0);
 }
@@ -209,8 +246,8 @@ void motion_callback(int x, int y) {
 	if (mouse_state.z == GLUT_LEFT_BUTTON) {	  
 		auto_rotate_vector.x = x - mouse_state.x;
 		auto_rotate_vector.y = y - mouse_state.y;
-		camera_right(auto_rotate_vector.x); 
-		camera_down(auto_rotate_vector.y);
+		view_base.camera_right(auto_rotate_vector.x); 
+		view_base.camera_down(auto_rotate_vector.y);
 	}
 	mouse_state.x = x;
 	mouse_state.y = y;
@@ -226,37 +263,33 @@ void reshape_callback(int w, int h) {
 	if (window_size.x != 0 && window_size.y != 0) {
 		glutSetWindow(subwindow_id);
 		glutPositionWindow(window_size.x/20, (window_size.y/20)*17);
-		glutReshapeWindow((window_size.x*18)/20, window_size.y/10);
+		glutReshapeWindow((window_size.x*18)/20, window_size.y/8);
 		glutSetWindow(window_id);
 	}
 }
 
 void display_callback_sub(void) {
 	//printf("Drawing subwindow...\n");
-	/**///cudaEventRecord(start, 0);
 	glClear(GL_COLOR_BUFFER_BIT);	
-	glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	float4 *transfer_fn = raycaster_base.transfer_fn;
 	glBegin(GL_QUAD_STRIP);
 	for (int i=0; i <= 255; i++) {
 		glColor4f(transfer_fn[i].x, transfer_fn[i].y, transfer_fn[i].z, 1.0f);
 		glVertex2f(i, 0);
-		glVertex2f(i, transfer_fn[i].w);
+		glVertex2f(i, sqrt(sqrt(transfer_fn[i].w)));
 	}
 	glEnd();
+	glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glBegin(GL_QUAD_STRIP);
 	for (int i=0; i <= 255; i++) {
-		glColor4f(1, 1, 1, 0.5f);
+		glColor4f(1, 1, 1, 0.9f);
 		glVertex2f(i, 0);
+		glColor4f(1, 1, 1, 0.1f);
 		glVertex2f(i, model_base.histogram[i]);
 	}
 	glEnd();
 	glDisable(GL_BLEND);
-	/*cudaEventRecord(stop, 0);
-	cudaEventSynchronize(stop);
-	cudaEventElapsedTime(&elapsed_time, start, stop);
-	printf("sub: %f\n", elapsed_time);*/
 	glutSwapBuffers();
 }
 
@@ -269,8 +302,10 @@ void motion_callback_sub(int x, int y) {
 	for (int i = 0; i <= steps; i++) {
 		int sample = CLAMP((int)((mouse_state.x + i * x_delta) / (win_width / 256)), 0, 255);
 		float intensity;
-		if (mouse_state.z == GLUT_LEFT_BUTTON) 
+		if (mouse_state.z == GLUT_LEFT_BUTTON) {
 			intensity = CLAMP(1.0f - (mouse_state.y + i * y_delta) / win_height, 0, 1.0f);
+			intensity = pow(intensity, 4);
+		}
 		if (mouse_state.z != GLUT_LEFT_BUTTON) 
 			intensity = 0;
 		transfer_fn[sample].w = intensity;
@@ -297,25 +332,38 @@ int main(int argc, char **argv) {
 	}
 
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);		//GLUT_DOUBLE | GLUT_MULTISAMPLE
+	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_MULTISAMPLE);		//GLUT_DOUBLE | GLUT_MULTISAMPLE
 	glutInitWindowSize(window_size.x, window_size.y);
-	glutInitWindowPosition(100,1);
+	glutInitWindowPosition(800, 1);
 
 	window_id = glutCreateWindow(APP_NAME);
 	glutDisplayFunc(display_callback);
 	glutKeyboardFunc(keyboard_callback);
 	glutMouseFunc(mouse_callback);
     glutMotionFunc(motion_callback);
-	glutTimerFunc(1, timer_callback, 0);
+	//glutTimerFunc(1, timer_callback, 0);
+	glutIdleFunc(idle_callback);
 	glutReshapeFunc(reshape_callback);
 
-	subwindow_id = glutCreateSubWindow(window_id, window_size.x/20, (window_size.y/20)*17, 255, 1);
+	//
+	glDisable(GL_DEPTH_TEST);
+    glViewport(0, 0, window_size.x, window_size.y);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
+	glClearColor(0.25, 0.25, 0.25, 1);
+	//
+
+	subwindow_id = glutCreateSubWindow(window_id, window_size.x/20, (window_size.y/20)*17, (window_size.x*18)/20, window_size.y/8);
+	glDisable(GL_DEPTH_TEST);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	glOrtho (0, 255, 0, 1, 0, 1);
-	glMatrixMode (GL_MODELVIEW);
-	glDisable(GL_DEPTH_TEST);
-	glClearColor(0.75f, 0.75f, 0.75f, 1);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glOrtho(0.0, 255.0, 0.0, 1.0, 0.0, 1.0);
+	glClearColor(0, 0, 0, 1);
 	glutDisplayFunc(display_callback_sub);
 	glutMouseFunc(mouse_callback_sub);
 	glutMotionFunc(motion_callback_sub);
@@ -347,8 +395,9 @@ int main(int argc, char **argv) {
 	cudaGLSetGLDevice(gpu_id);
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
+	cudaEventCreate(&frame);
 
-	reset_PBO();
+	reset_PBO(false);
 
 	raycaster_base.set_volume(model_base.volume);
 

@@ -6,8 +6,7 @@ Raycaster RaycasterBase::raycaster = {
 							View(),
 							0.06f,
 							0.95f,
-							0.0f,
-							{0.5f, 0.5f, 0.5f}
+							0.0f
 						};
 
 float4 RaycasterBase::transfer_fn[256];
@@ -19,7 +18,7 @@ void RaycasterBase::change_tf_offset(float offset, bool reset) {
 
 void RaycasterBase::change_ray_step(float step, bool reset) {
 	raycaster.ray_step = CLAMP(reset ? step : raycaster.ray_step + step, 0.001f, 1);
-	printf("Ray sampling step: %4.4f\n", raycaster.ray_step);
+	printf("Ray sampling step: %4.4f\n", 2/raycaster.ray_step);
 }
 
 void RaycasterBase::change_ray_threshold(float threshold, bool reset) {

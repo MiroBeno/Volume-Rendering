@@ -214,11 +214,11 @@
 				>
 			</File>
 			<File
-				RelativePath=".\projection.cpp"
+				RelativePath=".\RaycasterBase.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\RaycasterBase.cpp"
+				RelativePath=".\ViewBase.cpp"
 				>
 			</File>
 		</Filter>
@@ -240,15 +240,15 @@
 				>
 			</File>
 			<File
-				RelativePath=".\projection.h"
-				>
-			</File>
-			<File
 				RelativePath=".\Raycaster.h"
 				>
 			</File>
 			<File
 				RelativePath=".\Renderer.h"
+				>
+			</File>
+			<File
+				RelativePath=".\View.h"
 				>
 			</File>
 		</Filter>

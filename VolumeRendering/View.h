@@ -1,5 +1,5 @@
-#ifndef _PROJECTION_H_
-#define _PROJECTION_H_
+#ifndef _VIEW_H_
+#define _VIEW_H_
 
 #include "data_utils.h"
 
@@ -30,16 +30,27 @@ struct View {
 	}
 };
 
-float3 camera_down(float angle);
-float3 camera_right(float angle);
-float3 camera_zoom(float distance);
-float3 camera_down(int pixels);
-float3 camera_right(int pixels);
-float3 camera_zoom(int pixels);
-float3 set_camera_position(float distance, float vert_angle, float horiz_angle);
-void toggle_perspective();
-void set_window_size(int2 px);
-
-View get_view();
+class ViewBase {
+	public:
+		static View view;
+		static float3 camera_down(float angle);
+		static float3 camera_right(float angle);
+		static float3 camera_zoom(float distance);
+		static float3 camera_down(int pixels);
+		static float3 camera_right(int pixels);
+		static float3 camera_zoom(int pixels);
+		static float3 set_camera_position(float distance, float vert_angle, float horiz_angle);
+		static void toggle_perspective();
+		static void set_window_size(int2 px);
+	private:
+		static const float2 distance_limits;
+		static float2 cam_angles;
+		static float cam_distance;
+		static float3 cam_position;
+		static float cam_pixel_delta;
+		static float virtual_view_size;
+		static void update_view();
+		static float3 compute_camera_position();
+};
 
 #endif

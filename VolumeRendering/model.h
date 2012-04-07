@@ -24,6 +24,8 @@ class ModelBase {
 		static unsigned char *data;
 		static float histogram[256];
 		static int load_model(const char* file_name);
+	private:
+		static void compute_histogram();
 };
 
 #endif

@@ -2,7 +2,7 @@
 #define _RENDERER_H_
 
 #include "data_utils.h"
-#include "projection.h"
+#include "View.h"
 #include "Model.h"
 #include "Raycaster.h"
 

@@ -24,7 +24,7 @@ __global__ void render_ray(uchar4 dev_buffer[], unsigned char dev_volume_data[])
 	if ((pos.x >= raycaster.view.size_px.x) || (pos.y >= raycaster.view.size_px.y))	// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
 		return;
 
-	float4 color_acc = {0,0,0,0};
+	float4 color_acc = {0, 0, 0, 0};
 	float3 origin, direction;
 	float2 k_range;
 	raycaster.view.get_ray(pos, &origin, &direction); 

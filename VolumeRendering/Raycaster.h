@@ -2,8 +2,8 @@
 #define _RAYCASTER_H_
 
 #include "data_utils.h"
-#include "model.h"
-#include "projection.h"
+#include "Model.h"
+#include "View.h"
 
 struct Raycaster {
 	Model model;
@@ -11,7 +11,6 @@ struct Raycaster {
 	float ray_step;
 	float ray_threshold;
 	float tf_offset;
-	float3 bg_color;
 
 	__host__ __device__ float4 sample_color(unsigned char volume_data[], float4 transfer_fn[], float3 pos) {
 		unsigned char sample = model.sample_data(volume_data, pos);
@@ -32,13 +31,11 @@ struct Raycaster {
 	}	
 
 	__host__ __device__ void write_color(float4 color, int2 pos, uchar4 buffer[]) {
-		if (color.w <= ray_threshold)
-			color = color + (bg_color * (1 - color.w));
 		buffer[pos.y * view.size_px.x + pos.x] = 
-			make_uchar4( map_float_int(color.x,256), 
-						map_float_int(color.y,256), 
-						map_float_int(color.z,256), 
-						255);
+			make_uchar4( map_float_int(color.x, 256), 
+						map_float_int(color.y, 256), 
+						map_float_int(color.z, 256), 
+						map_float_int(color.w, 256));
 	}
 };
 
