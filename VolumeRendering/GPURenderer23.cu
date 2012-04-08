@@ -1,8 +1,7 @@
 // CUDA implementation using constant memory / constant memory + GL interop
 
+#include "cuda_utils.h"
 #include "Renderer.h"
-
-#include "cuda_runtime_api.h"
 
 static __constant__ Raycaster raycaster;
 static __constant__ float4 transfer_fn[256];
@@ -41,20 +40,22 @@ __global__ void render_ray(uchar4 dev_buffer[], unsigned char dev_volume_data[])
 }
 
 void GPURenderer2::set_transfer_fn(float4 *tf) {
-	cudaMemcpyToSymbol(transfer_fn, tf, 256 * sizeof(float4));
+	cuda_safe_call(cudaMemcpyToSymbol(transfer_fn, tf, 256 * sizeof(float4)));
 }
 
 int GPURenderer2::render_volume(uchar4 *buffer, Raycaster *r) {
-	cudaMemset(dev_buffer, 0, dev_buffer_size);
-	cudaMemcpyToSymbol(raycaster, r, sizeof(Raycaster));
+	cuda_safe_call(cudaMemset(dev_buffer, 0, dev_buffer_size));
+	cuda_safe_call(cudaMemcpyToSymbol(raycaster, r, sizeof(Raycaster)));
 	render_ray<<<num_blocks, THREADS_PER_BLOCK>>>(dev_buffer, dev_volume_data);
-	cudaMemcpy(buffer, dev_buffer, dev_buffer_size, cudaMemcpyDeviceToHost);
+	cuda_safe_check();
+	cuda_safe_call(cudaMemcpy(buffer, dev_buffer, dev_buffer_size, cudaMemcpyDeviceToHost));
 	return 0;
 }
 
 int GPURenderer3::render_volume(uchar4 *buffer, Raycaster *r) {
-	cudaMemset(buffer, 0, dev_buffer_size);
-	cudaMemcpyToSymbol(raycaster, r, sizeof(Raycaster));
+	cuda_safe_call(cudaMemset(buffer, 0, dev_buffer_size));
+	cuda_safe_call(cudaMemcpyToSymbol(raycaster, r, sizeof(Raycaster)));
 	render_ray<<<num_blocks, THREADS_PER_BLOCK>>>(buffer, dev_volume_data);
+	cuda_safe_check();
 	return 0;
 }

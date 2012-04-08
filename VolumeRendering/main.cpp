@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 #include "glew.h"
 #include "glut.h"
@@ -11,7 +10,7 @@
 #include "Raycaster.h"
 #include "Renderer.h"
 
-#include "cuda_runtime_api.h"
+#include "cuda_utils.h"
 #include "cuda_gl_interop.h"
 
 const char *APP_NAME = "VR:";
@@ -48,7 +47,7 @@ static ViewBase view_base;
 
 void delete_PBO_texture() {
     if (pbo_gl_id != NULL) {
-		cudaGraphicsUnregisterResource(pbo_cuda_id);
+		cuda_safe_call(cudaGraphicsUnregisterResource(pbo_cuda_id));
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 		glDeleteBuffersARB(1, &pbo_gl_id);
     }
@@ -64,7 +63,7 @@ void reset_PBO_texture() {
 	glGenBuffersARB(1, &pbo_gl_id);	
 	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_gl_id);
 	glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, window_size.x * window_size.y * 4, NULL, GL_STREAM_DRAW_ARB);		//GL_STREAM_DRAW_ARB|GL_DYNAMIC_DRAW_ARB ??  // int CHANNEL_COUNT = 4;
-	cudaGraphicsGLRegisterBuffer(&pbo_cuda_id, pbo_gl_id, cudaGraphicsMapFlagsWriteDiscard);
+	cuda_safe_call(cudaGraphicsGLRegisterBuffer(&pbo_cuda_id, pbo_gl_id, cudaGraphicsMapFlagsWriteDiscard));
 	glGenTextures(1, &tex_gl_id);
 	glBindTexture(GL_TEXTURE_2D, tex_gl_id);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, window_size.x, window_size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
@@ -79,8 +78,8 @@ uchar4 *prepare_PBO() {							//GLubyte *
 	else {
 		uchar4 *dev_buffer;
 		size_t dev_buffer_size;
-		cudaGraphicsMapResources(1, &pbo_cuda_id, 0);
-		cudaGraphicsResourceGetMappedPointer((void **)&dev_buffer, &dev_buffer_size, pbo_cuda_id);
+		cuda_safe_call(cudaGraphicsMapResources(1, &pbo_cuda_id, 0));
+		cuda_safe_call(cudaGraphicsResourceGetMappedPointer((void **)&dev_buffer, &dev_buffer_size, pbo_cuda_id));
 		return dev_buffer;
 	}
 }
@@ -90,7 +89,7 @@ void finalize_PBO() {
 		glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB);
 	}
 	else {
-		cudaGraphicsUnmapResources(1, &pbo_cuda_id, 0);
+		cuda_safe_call(cudaGraphicsUnmapResources(1, &pbo_cuda_id, 0));
 	}		
 }
 
@@ -107,16 +106,16 @@ void draw_volume() {
 	}
 	raycaster_base.raycaster.view = view_base.view;
 	uchar4 *pbo_array = prepare_PBO();
-	cudaEventRecord(start, 0);
+	cuda_safe_call(cudaEventRecord(start, 0));
 	renderers[renderer_id]->render_volume(pbo_array, &raycaster_base.raycaster);
-	cudaEventRecord(stop, 0);
-	cudaEventSynchronize(stop);
-	cudaEventElapsedTime(&elapsed_time.x, start, stop);
-	cudaEventElapsedTime(&elapsed_time.y, frame, stop);
+	cuda_safe_call(cudaEventRecord(stop, 0));
+	cuda_safe_call(cudaEventSynchronize(stop));
+	cuda_safe_call(cudaEventElapsedTime(&elapsed_time.x, start, stop));
+	cuda_safe_call(cudaEventElapsedTime(&elapsed_time.y, frame, stop));
 	finalize_PBO();
 	sprintf(title_string, "%s %s @ %.2f ms / %.2f ms (%dx%d)", APP_NAME, renderer_names[renderer_id], elapsed_time.x, elapsed_time.y, window_size.x, window_size.y);
 	glutSetWindowTitle(title_string);
-	cudaEventRecord(frame, 0);
+	cuda_safe_call(cudaEventRecord(frame, 0));
 	glutPostRedisplay();
 }
 
@@ -170,9 +169,9 @@ void keyboard_callback(unsigned char key, int x, int y) {
 					break;
 	}
 	if (key==27) {
-		cudaEventDestroy(start);
-		cudaEventDestroy(stop);
-		cudaEventDestroy(frame);
+		cuda_safe_call(cudaEventDestroy(start));
+		cuda_safe_call(cudaEventDestroy(stop));
+		cuda_safe_call(cudaEventDestroy(frame));
 		delete_PBO_texture();
 		for (int i = RENDERERS_COUNT - 1; i >=0 ; i--)
 			delete renderers[i];
@@ -377,11 +376,12 @@ int main(int argc, char **argv) {
 	memset(&prop, 0, sizeof(cudaDeviceProp));
 	prop.major = 1;
 	prop.major = 0;
-	cudaChooseDevice(&gpu_id, &prop);
-	cudaGLSetGLDevice(gpu_id);
-	cudaEventCreate(&start);
-	cudaEventCreate(&stop);
-	cudaEventCreate(&frame);
+	cuda_safe_call(cudaChooseDevice(&gpu_id, &prop));
+	cuda_safe_call(cudaGLSetGLDevice(gpu_id));
+	cuda_safe_call(cudaEventCreate(&start));
+	cuda_safe_call(cudaEventCreate(&stop));
+	cuda_safe_call(cudaEventCreate(&frame));
+	cuda_safe_call(cudaEventRecord(frame, 0));
 
 	reset_PBO_texture();
 

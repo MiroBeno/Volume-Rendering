@@ -1,8 +1,7 @@
 // Standard CUDA implementation
 
+#include "cuda_utils.h"
 #include "Renderer.h"
-
-#include "cuda_runtime_api.h"
 
 uchar4 *GPURenderer::dev_buffer = NULL;
 int GPURenderer::dev_buffer_size = 0;
@@ -19,9 +18,9 @@ GPURenderer1::GPURenderer1(int2 size, float4 *tf, Model volume, unsigned char *d
 }
 
 GPURenderer1::~GPURenderer1() {
-	cudaFree(dev_buffer);
-	cudaFree(dev_volume_data);
-	cudaFree(transfer_fn);
+	cuda_safe_call(cudaFree(dev_buffer));
+	cuda_safe_call(cudaFree(dev_volume_data));
+	cuda_safe_call(cudaFree(transfer_fn));
 }
 
 __global__ void render_ray(Raycaster raycaster, uchar4 dev_buffer[], unsigned char dev_volume_data[], float4 transfer_fn[]) {
@@ -47,15 +46,15 @@ __global__ void render_ray(Raycaster raycaster, uchar4 dev_buffer[], unsigned ch
 
 void GPURenderer1::set_transfer_fn(float4 *tf) {
 	if (transfer_fn == NULL)
-		cudaMalloc((void **)&transfer_fn, 256 * sizeof(float4));
-	cudaMemcpy(transfer_fn, tf, 256 * sizeof(float4), cudaMemcpyHostToDevice);
+		cuda_safe_call(cudaMalloc((void **)&transfer_fn, 256 * sizeof(float4)));
+	cuda_safe_call(cudaMemcpy(transfer_fn, tf, 256 * sizeof(float4), cudaMemcpyHostToDevice));
 }
 
 void GPURenderer1::set_window_buffer(int2 size) {
 	if (dev_buffer != NULL)
-		cudaFree(dev_buffer);
+		cuda_safe_call(cudaFree(dev_buffer));
 	dev_buffer_size = size.x * size.y * 4;
-	cudaMalloc((void **)&dev_buffer, dev_buffer_size);
+	cuda_safe_call(cudaMalloc((void **)&dev_buffer, dev_buffer_size));
 	num_blocks = dim3((size.x + THREADS_PER_BLOCK.x - 1) / THREADS_PER_BLOCK.x, 
 					  (size.y + THREADS_PER_BLOCK.y - 1) / THREADS_PER_BLOCK.y);		
 			// celociselne delenie, ak su rozmery okna nedelitelne 16, spustaju sa bloky s nevyuzitimi threadmi
@@ -63,14 +62,15 @@ void GPURenderer1::set_window_buffer(int2 size) {
 
 void GPURenderer1::set_volume(Model volume, unsigned char *d) {
 	if (dev_volume_data != NULL)
-		cudaFree(dev_volume_data);
-	cudaMalloc((void **)&dev_volume_data, volume.size);
-	cudaMemcpy(dev_volume_data, d, volume.size, cudaMemcpyHostToDevice);
+		cuda_safe_call(cudaFree(dev_volume_data));
+	cuda_safe_call(cudaMalloc((void **)&dev_volume_data, volume.size));
+	cuda_safe_call(cudaMemcpy(dev_volume_data, d, volume.size, cudaMemcpyHostToDevice));
 }
 
 int GPURenderer1::render_volume(uchar4 *buffer, Raycaster *r) {
-	cudaMemset(dev_buffer, 0, dev_buffer_size);
+	cuda_safe_call(cudaMemset(dev_buffer, 0, dev_buffer_size));
 	render_ray<<<num_blocks, THREADS_PER_BLOCK>>>(*r, dev_buffer, dev_volume_data, transfer_fn);
-	cudaMemcpy(buffer, dev_buffer, dev_buffer_size, cudaMemcpyDeviceToHost);
+	cuda_safe_check();
+	cuda_safe_call(cudaMemcpy(buffer, dev_buffer, dev_buffer_size, cudaMemcpyDeviceToHost));
 	return 0;
 }

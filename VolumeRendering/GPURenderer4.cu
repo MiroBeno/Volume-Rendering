@@ -1,14 +1,7 @@
 // CUDA implementation using constant memory + 3D texture memory + GL interop
 
+#include "cuda_utils.h"
 #include "Renderer.h"
-
-#include "cuda_runtime_api.h"
-#include "driver_types.h"
-#include "driver_functions.h"
-#include "channel_descriptor.h"
-#include "cuda_texture_types.h"
-#include "texture_types.h"
-#include "texture_fetch_functions.h"
 
 static __constant__ Raycaster raycaster;
 //static __constant__ float4 transfer_fn[256];
@@ -25,10 +18,10 @@ GPURenderer4::GPURenderer4(int2 size, float4 *tf, Model volume, unsigned char *d
 }
 
 GPURenderer4::~GPURenderer4() {
-	cudaUnbindTexture(volume_texture);
-	cudaFreeArray(volume_array);
-	cudaUnbindTexture(transfer_fn_texture);
-	cudaFreeArray(transfer_fn_array);
+	cuda_safe_call(cudaUnbindTexture(volume_texture));
+	cuda_safe_call(cudaFreeArray(volume_array));
+	cuda_safe_call(cudaUnbindTexture(transfer_fn_texture));
+	cuda_safe_call(cudaFreeArray(transfer_fn_array));
 }
 
 __device__ float4 sample_color_texture(float3 pos) {
@@ -65,43 +58,44 @@ __global__ void render_ray(uchar4 dev_buffer[]) {
 void GPURenderer4::set_transfer_fn(float4 *tf) {
 	if (transfer_fn_array == 0) {
 		cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<float4>();
-		cudaMallocArray(&transfer_fn_array, &channelDesc, 256, 1); 
-		cudaMemcpyToArray(transfer_fn_array, 0, 0, tf, 256 * sizeof(float4), cudaMemcpyHostToDevice);
+		cuda_safe_call(cudaMallocArray(&transfer_fn_array, &channelDesc, 256, 1)); 
+		cuda_safe_call(cudaMemcpyToArray(transfer_fn_array, 0, 0, tf, 256 * sizeof(float4), cudaMemcpyHostToDevice));
 
 		transfer_fn_texture.filterMode = cudaFilterModeLinear; 
 		transfer_fn_texture.normalized = true;
 		transfer_fn_texture.addressMode[0] = cudaAddressModeClamp; 
-		cudaBindTextureToArray(transfer_fn_texture, transfer_fn_array, channelDesc);
+		cuda_safe_call(cudaBindTextureToArray(transfer_fn_texture, transfer_fn_array, channelDesc));
 	}
 	else {
-		cudaMemcpyToArray(transfer_fn_array, 0, 0, tf, 256 * sizeof(float4), cudaMemcpyHostToDevice);
-		//cudaMemcpyToSymbol(transfer_fn, tf, 256 * sizeof(float4));
+		cuda_safe_call(cudaMemcpyToArray(transfer_fn_array, 0, 0, tf, 256 * sizeof(float4), cudaMemcpyHostToDevice));
+		//cuda_safe_call(cudaMemcpyToSymbol(transfer_fn, tf, 256 * sizeof(float4)));
 	}
 }
 
 void GPURenderer4::set_volume(Model volume, unsigned char *d) {
 	cudaExtent volumeDims = {volume.dims.x, volume.dims.y, volume.dims.z};	
 	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<unsigned char>();	
-	cudaMalloc3DArray(&volume_array, &channelDesc, volumeDims);
+	cuda_safe_call(cudaMalloc3DArray(&volume_array, &channelDesc, volumeDims));
 
     cudaMemcpy3DParms copyParams = {0};
 	copyParams.srcPtr   = make_cudaPitchedPtr(d, volumeDims.width*sizeof(unsigned char), volumeDims.width, volumeDims.height);
     copyParams.dstArray = volume_array;
     copyParams.extent   = volumeDims;
     copyParams.kind     = cudaMemcpyHostToDevice;
-    cudaMemcpy3D(&copyParams);
+    cuda_safe_call(cudaMemcpy3D(&copyParams));
 
     volume_texture.normalized = true;                      
     volume_texture.filterMode = cudaFilterModeLinear; //vypnut pri cm ?   
     volume_texture.addressMode[0] = cudaAddressModeClamp;  
     volume_texture.addressMode[1] = cudaAddressModeClamp;
     volume_texture.addressMode[2] = cudaAddressModeClamp;
-    cudaBindTextureToArray(volume_texture, volume_array, channelDesc);
+    cuda_safe_call(cudaBindTextureToArray(volume_texture, volume_array, channelDesc));
 }
 
 int GPURenderer4::render_volume(uchar4 *buffer, Raycaster *r) {
-	cudaMemset(buffer, 0, dev_buffer_size);
-	cudaMemcpyToSymbol(raycaster, r, sizeof(Raycaster));
+	cuda_safe_call(cudaMemset(buffer, 0, dev_buffer_size));
+	cuda_safe_call(cudaMemcpyToSymbol(raycaster, r, sizeof(Raycaster)));
 	render_ray<<<num_blocks, THREADS_PER_BLOCK>>>(buffer);
+	cuda_safe_check();
 	return 0;
 }
