@@ -18,9 +18,8 @@ struct View {
 	__host__ __device__ void get_ray(int2 pos, float3 *origin_vector, float3 *direction_vector) {
 		if (perspective_ray) {
 			*origin_vector = origin;
-			*direction_vector = origin * 0.6f + (right_plane * (float) (pos.x - half_px.x));
+			*direction_vector = direction + (right_plane * (float) (pos.x - half_px.x));
 			*direction_vector = *direction_vector + (up_plane * (float) (pos.y - half_px.y));
-			*direction_vector = vector_normalize(*direction_vector + (-*origin_vector));
 		}
 		else {
 			*direction_vector = direction;
@@ -47,7 +46,7 @@ class ViewBase {
 		static float2 cam_angles;
 		static float cam_distance;
 		static float3 cam_position;
-		static float cam_pixel_delta;
+		static float2 cam_pixel_delta;
 		static float virtual_view_size;
 		static void update_view();
 		static float3 compute_camera_position();

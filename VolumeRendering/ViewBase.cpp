@@ -3,20 +3,21 @@
 
 View ViewBase::view = {	{INT_WIN_WIDTH, INT_WIN_HEIGHT}, 
 						{INT_WIN_WIDTH / 2, INT_WIN_HEIGHT / 2}, 
-						{2, 0, 0},
+						{3, 0, 0},
 						{-1, 0, 0},
 						make_float3(0, 0, -1) * (3.0f / MINIMUM(INT_WIN_WIDTH, INT_WIN_HEIGHT)),
 						make_float3(0, 1, 0) * (3.0f / MINIMUM(INT_WIN_WIDTH, INT_WIN_HEIGHT)),
 						false
 					 };
 
-const float2 ViewBase::distance_limits = {0.1f, 5};
+const float2 ViewBase::distance_limits = {0.1f, 3};
 
 float2 ViewBase::cam_angles = {0, 0};			// x - horizontalny uhol, y - vertikalny uhol
-float ViewBase::cam_distance = 2;
-float3 ViewBase::cam_position = {2, 0, 0};
+float ViewBase::cam_distance = 3;
+float3 ViewBase::cam_position = {3, 0, 0};
 
-float ViewBase::cam_pixel_delta = 180.0f / (MINIMUM(INT_WIN_WIDTH, INT_WIN_HEIGHT));
+float2 ViewBase::cam_pixel_delta = {180.0f / (MINIMUM(INT_WIN_WIDTH, INT_WIN_HEIGHT)),					// pixel na uhol rotacie kamery
+									(distance_limits.y - distance_limits.x) / (INT_WIN_HEIGHT / 2)};			// pixel na vzdialenost kamery
 float ViewBase::virtual_view_size = 3.0f;		// velkost virtualneho okna v priestore
 
 void ViewBase::update_view() {	
@@ -74,33 +75,33 @@ float3 ViewBase::camera_zoom(float distance) {
 }
 
 float3 ViewBase::camera_down(int pixels) {
-	return camera_down(pixels * cam_pixel_delta);
+	return camera_down(pixels * cam_pixel_delta.x);
 }
 
 float3 ViewBase::camera_right(int pixels) {
-	return camera_right(pixels * cam_pixel_delta);
+	return camera_right(pixels * cam_pixel_delta.x);
 }
 
 float3 ViewBase::camera_zoom(int pixels) {
-	return camera_zoom(pixels * cam_pixel_delta);
+	return camera_zoom(pixels * cam_pixel_delta.y);
 }
 
 float3 ViewBase::set_camera_position(float distance, float vert_angle, float horiz_angle) {
-	cam_distance = 0;
 	cam_angles.y = 0;
-	cam_angles.x = 0;
 	camera_down(vert_angle);
+	cam_angles.x = 0;
 	camera_right(horiz_angle);
+	cam_distance = 0;
 	return camera_zoom(distance);
 }
 
 void ViewBase::toggle_perspective() {
 	view.perspective_ray = !view.perspective_ray;
 	if (view.perspective_ray) 
-		virtual_view_size = 2.0f;
-	else
+		virtual_view_size = 1.5f;
+	else 
 		virtual_view_size = 3.0f;
-	printf("Perspective: %s\n", view.perspective_ray ? "on" : "off");
+	printf("Perspective rays: %s\n", view.perspective_ray ? "on" : "off");
 	update_view();
 }
 
@@ -108,7 +109,8 @@ void ViewBase::set_window_size(int2 px) {
 	view.size_px = px; 
 	view.half_px.x = px.x / 2; 
 	view.half_px.y = px.y / 2;
-	cam_pixel_delta = 180.0f / (MINIMUM(px.x, px.y));
+	cam_pixel_delta.x = 180.0f / (MINIMUM(px.x, px.y));
+	cam_pixel_delta.y = (distance_limits.y - distance_limits.x) / view.half_px.y;
 	update_view();
 }
 

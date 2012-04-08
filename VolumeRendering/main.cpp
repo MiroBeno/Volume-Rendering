@@ -139,9 +139,9 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		case '2': renderer_id = 2; break;
 		case '3': renderer_id = 3; break;
 		case '4': renderer_id = 4; break;
-		case '8': view_base.set_camera_position(2,0,0); break;
-		case '9': view_base.set_camera_position(2,-90,0); break;
-		case '0': view_base.set_camera_position(2,180,-90); break;
+		case '8': view_base.set_camera_position(3,0,0); break;
+		case '9': view_base.set_camera_position(3,-90,0); break;
+		case '0': view_base.set_camera_position(3,180,-90); break;
 		case 'r':	if (auto_rotate_vector.x == 0 && auto_rotate_vector.y == 0) {
 						auto_rotate_vector = make_int2(-5, -5);
 						printf("Autorotation: on\n");
@@ -235,6 +235,9 @@ void motion_callback(int x, int y) {
 		auto_rotate_vector.y = y - mouse_state.y;
 		view_base.camera_right(auto_rotate_vector.x); 
 		view_base.camera_down(auto_rotate_vector.y);
+	}
+	if (mouse_state.z == GLUT_RIGHT_BUTTON) {	  
+		view_base.camera_zoom(y - mouse_state.y); 
 	}
 	mouse_state.x = x;
 	mouse_state.y = y;
