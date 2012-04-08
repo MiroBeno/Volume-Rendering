@@ -31,7 +31,6 @@ static GLuint tex_gl_id = NULL;
 static int gpu_id;
 static cudaGraphicsResource *pbo_cuda_id;
 
-static bool use_texture_display = false;
 static int4 mouse_state = make_int4(0, 0, 0, GLUT_UP);
 static int2 auto_rotate_vector = {0, 0};
 
@@ -47,30 +46,30 @@ static RaycasterBase raycaster_base;
 static ModelBase model_base;
 static ViewBase view_base;
 
-void reset_PBO(bool destroy) {
-	printf("Setting PBO...\n");
+void delete_PBO_texture() {
     if (pbo_gl_id != NULL) {
 		cudaGraphicsUnregisterResource(pbo_cuda_id);
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 		glDeleteBuffersARB(1, &pbo_gl_id);
-		//
+    }
+	if (tex_gl_id != NULL) {
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glDeleteTextures(1, &tex_gl_id);
-		//
-    }
-	if (!destroy) {
-		glGenBuffersARB(1, &pbo_gl_id);	
-		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_gl_id);
-		glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, window_size.x * window_size.y * 4, NULL, GL_STREAM_DRAW_ARB);		//GL_STREAM_DRAW_ARB|GL_DYNAMIC_DRAW_ARB ??  // int CHANNEL_COUNT = 4;
-		cudaGraphicsGLRegisterBuffer(&pbo_cuda_id, pbo_gl_id, cudaGraphicsMapFlagsWriteDiscard);
-		//
-		glGenTextures(1, &tex_gl_id);
-		glBindTexture(GL_TEXTURE_2D, tex_gl_id);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, window_size.x, window_size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		//
 	}
+}
+
+void reset_PBO_texture() {
+	printf("Setting PBO...\n");
+	delete_PBO_texture();
+	glGenBuffersARB(1, &pbo_gl_id);	
+	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_gl_id);
+	glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, window_size.x * window_size.y * 4, NULL, GL_STREAM_DRAW_ARB);		//GL_STREAM_DRAW_ARB|GL_DYNAMIC_DRAW_ARB ??  // int CHANNEL_COUNT = 4;
+	cudaGraphicsGLRegisterBuffer(&pbo_cuda_id, pbo_gl_id, cudaGraphicsMapFlagsWriteDiscard);
+	glGenTextures(1, &tex_gl_id);
+	glBindTexture(GL_TEXTURE_2D, tex_gl_id);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, window_size.x, window_size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
 
 uchar4 *prepare_PBO() {							//GLubyte *
@@ -99,7 +98,7 @@ void draw_volume() {
 	//printf("Drawing volume...\n");
 	glutSetWindow(window_id);
 	if (window_resize_flag) {
-		reset_PBO(false);
+		reset_PBO_texture();
 		glViewport(0, 0, window_size.x, window_size.y);
 		for (int i=0; i < RENDERERS_COUNT; i++)
 			renderers[i]->set_window_buffer(window_size);
@@ -108,7 +107,7 @@ void draw_volume() {
 	}
 	raycaster_base.raycaster.view = view_base.view;
 	uchar4 *pbo_array = prepare_PBO();
-	cudaEventRecord(start, 0);	
+	cudaEventRecord(start, 0);
 	renderers[renderer_id]->render_volume(pbo_array, &raycaster_base.raycaster);
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);
@@ -141,10 +140,9 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		case '2': renderer_id = 2; break;
 		case '3': renderer_id = 3; break;
 		case '4': renderer_id = 4; break;
-		case '7': view_base.set_camera_position(2,45,45); break;
-		case '8': view_base.set_camera_position(2,135,225); break;
-		case '9': view_base.set_camera_position(2,225,225); break;
-		case '0': view_base.set_camera_position(2,0,0); break;
+		case '8': view_base.set_camera_position(2,0,0); break;
+		case '9': view_base.set_camera_position(2,-90,0); break;
+		case '0': view_base.set_camera_position(2,180,-90); break;
 		case 'r':	if (auto_rotate_vector.x == 0 && auto_rotate_vector.y == 0) {
 						auto_rotate_vector = make_int2(-5, -5);
 						printf("Autorotation: on\n");
@@ -153,9 +151,6 @@ void keyboard_callback(unsigned char key, int x, int y) {
 						auto_rotate_vector = make_int2(0, 0);
 						printf("Autorotation: off\n");
 					}
-					break;
-		case 't':	use_texture_display = (!use_texture_display); 
-					printf("Texture display mode: %s\n", (use_texture_display)?"true":"false");
 					break;
 		case 'b': glutSwapBuffers(); break;
 		case 'v': draw_volume(); break;
@@ -178,7 +173,7 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		cudaEventDestroy(start);
 		cudaEventDestroy(stop);
 		cudaEventDestroy(frame);
-		reset_PBO(true);
+		delete_PBO_texture();
 		for (int i = RENDERERS_COUNT - 1; i >=0 ; i--)
 			delete renderers[i];
 		free(model_base.data);
@@ -192,20 +187,13 @@ void display_callback(void) {
 	glClear(GL_COLOR_BUFFER_BIT);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	if (!use_texture_display) {
-		glDisable(GL_TEXTURE_2D);
-		glDrawPixels(window_size.x, window_size.y, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-	}
-	else {
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, window_size.x, window_size.y, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-		glEnable(GL_TEXTURE_2D);
-		glBegin(GL_QUADS);
-		glTexCoord2f(0, 0); glVertex2f(0, 0);
-		glTexCoord2f(1, 0); glVertex2f(1, 0);
-		glTexCoord2f(1, 1); glVertex2f(1, 1);
-		glTexCoord2f(0, 1); glVertex2f(0, 1);
-		glEnd();
-	}
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, window_size.x, window_size.y, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	glBegin(GL_QUADS);
+	glTexCoord2f(0, 0); glVertex2f(0, 0);
+	glTexCoord2f(1, 0); glVertex2f(1, 0);
+	glTexCoord2f(1, 1); glVertex2f(1, 1);
+	glTexCoord2f(0, 1); glVertex2f(0, 1);
+	glEnd();
 	glDisable(GL_BLEND);
 	glutSwapBuffers();
 }
@@ -229,6 +217,7 @@ void timer_callback(int value) {
 }
 
 void mouse_callback(int button, int state, int x, int y) {
+	//printf("Mouse click: button:%i state:%i x:%i y:%i\n", button, state, x, y);
 	mouse_state.x = x;
 	mouse_state.y = y;
 	mouse_state.z = button;
@@ -239,7 +228,6 @@ void mouse_callback(int button, int state, int x, int y) {
 		if (abs(auto_rotate_vector.x) < 8 && abs(auto_rotate_vector.y) < 8)
 			auto_rotate_vector = make_int2(0, 0);
 	}
-	//printf("Mouse click: button:%i state:%i x:%i y:%i\n", button, state, x, y);
 }
 
 void motion_callback(int x, int y) {
@@ -271,12 +259,12 @@ void reshape_callback(int w, int h) {
 void display_callback_sub(void) {
 	//printf("Drawing subwindow...\n");
 	glClear(GL_COLOR_BUFFER_BIT);	
-	float4 *transfer_fn = raycaster_base.transfer_fn;
+	float4 *tf = raycaster_base.transfer_fn;
 	glBegin(GL_QUAD_STRIP);
 	for (int i=0; i <= 255; i++) {
-		glColor4f(transfer_fn[i].x, transfer_fn[i].y, transfer_fn[i].z, 1.0f);
+		glColor4f(tf[i].x, tf[i].y, tf[i].z, 1.0f);
 		glVertex2f(i, 0);
-		glVertex2f(i, sqrt(sqrt(transfer_fn[i].w)));
+		glVertex2f(i, sqrt(sqrt(tf[i].w)));
 	}
 	glEnd();
 	glEnable(GL_BLEND);
@@ -294,7 +282,6 @@ void display_callback_sub(void) {
 }
 
 void motion_callback_sub(int x, int y) {
-	float4 *transfer_fn = raycaster_base.transfer_fn;
 	float win_width = (float)glutGet(GLUT_WINDOW_WIDTH), win_height = (float)glutGet(GLUT_WINDOW_HEIGHT);
 	int steps = abs(x - mouse_state.x);
 	int x_delta = mouse_state.x < x ? 1 : -1;
@@ -308,7 +295,7 @@ void motion_callback_sub(int x, int y) {
 		}
 		if (mouse_state.z != GLUT_LEFT_BUTTON) 
 			intensity = 0;
-		transfer_fn[sample].w = intensity;
+		raycaster_base.transfer_fn[sample].w = intensity;
 	}
 	mouse_state.x = x;
 	mouse_state.y = y;
@@ -344,19 +331,20 @@ int main(int argc, char **argv) {
 	//glutTimerFunc(1, timer_callback, 0);
 	glutIdleFunc(idle_callback);
 	glutReshapeFunc(reshape_callback);
-
-	//
 	glDisable(GL_DEPTH_TEST);
-    glViewport(0, 0, window_size.x, window_size.y);
+	glEnable(GL_TEXTURE_2D);
+    //glViewport(0, 0, window_size.x, window_size.y);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     glOrtho(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
 	glClearColor(0.25, 0.25, 0.25, 1);
-	//
 
 	subwindow_id = glutCreateSubWindow(window_id, window_size.x/20, (window_size.y/20)*17, (window_size.x*18)/20, window_size.y/8);
+	glutDisplayFunc(display_callback_sub);
+	glutMouseFunc(mouse_callback_sub);
+	glutMotionFunc(motion_callback_sub);
 	glDisable(GL_DEPTH_TEST);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
@@ -364,9 +352,7 @@ int main(int argc, char **argv) {
 	glLoadIdentity();
 	glOrtho(0.0, 255.0, 0.0, 1.0, 0.0, 1.0);
 	glClearColor(0, 0, 0, 1);
-	glutDisplayFunc(display_callback_sub);
-	glutMouseFunc(mouse_callback_sub);
-	glutMotionFunc(motion_callback_sub);
+
 	glutSetWindow(window_id);
 
 	GLenum err = glewInit();
@@ -397,7 +383,7 @@ int main(int argc, char **argv) {
 	cudaEventCreate(&stop);
 	cudaEventCreate(&frame);
 
-	reset_PBO(false);
+	reset_PBO_texture();
 
 	raycaster_base.set_volume(model_base.volume);
 

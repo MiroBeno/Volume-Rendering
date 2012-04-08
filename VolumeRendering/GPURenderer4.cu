@@ -46,12 +46,11 @@ __global__ void render_ray(uchar4 dev_buffer[]) {
 	if ((pos.x >= raycaster.view.size_px.x) || (pos.y >= raycaster.view.size_px.y))	// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
 		return;
 
-	float4 color_acc = {0, 0, 0, 0};
 	float3 origin, direction;
 	float2 k_range;
 	raycaster.view.get_ray(pos, &origin, &direction); 
-
-	if (raycaster.intersect(origin, direction, &k_range)) {			
+	if (raycaster.intersect(origin, direction, &k_range)) {	
+		float4 color_acc = {0, 0, 0, 0};
 		for (float k = k_range.x; k <= k_range.y; k += raycaster.ray_step) {		
 			float3 pt = origin + (direction * k);
 			float4 color_cur = sample_color_texture(pt);
@@ -59,8 +58,8 @@ __global__ void render_ray(uchar4 dev_buffer[]) {
 			if (color_acc.w > raycaster.ray_threshold) 
 				break;
 		}
+		raycaster.write_color(color_acc, pos, dev_buffer);
 	}
-	raycaster.write_color(color_acc, pos, dev_buffer);
 }
 
 void GPURenderer4::set_transfer_fn(float4 *tf) {
@@ -101,6 +100,7 @@ void GPURenderer4::set_volume(Model volume, unsigned char *d) {
 }
 
 int GPURenderer4::render_volume(uchar4 *buffer, Raycaster *r) {
+	cudaMemset(buffer, 0, dev_buffer_size);
 	cudaMemcpyToSymbol(raycaster, r, sizeof(Raycaster));
 	render_ray<<<num_blocks, THREADS_PER_BLOCK>>>(buffer);
 	return 0;

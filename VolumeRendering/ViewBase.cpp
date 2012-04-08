@@ -27,12 +27,12 @@ void ViewBase::update_view() {
 		view.direction.x = 0.0001f;
 	
 	float3 y_vector = {0, 1, 0}; 
-	if ((cam_angles.y >= -PI/2) && (cam_angles.y <= PI/2)) 
+	if ((cam_angles.y > -PI/2) && (cam_angles.y < PI/2)) 
 		y_vector = -y_vector;
 	view.right_plane = cross_product(y_vector, view.direction);		// pravidlo pravej ruky v pravotocivej sustave, vektorove nasobenie vrati pravy uhol na dva vektory
 	view.up_plane = cross_product(view.right_plane, view.direction);
 
-	//printf("view vector:%4.2f %4.2f %4.2f\nup vector:%4.2f %4.2f %4.2f\nright vector:%4.2f %4.2f %4.2f\n\n", view_vector.x, view_vector.y, view_vector.z, view_up_plane.x, view_up_plane.y, view_up_plane.z, view_right_plane.x, view_right_plane.y, view_right_plane.z);
+	//printf("vd:%4.2f %4.2f %4.2f\nup vector:%4.2f %4.2f %4.2f\nright vector:%4.2f %4.2f %4.2f\n\n", view.direction.x, view.direction.y, view.direction.z, view.up_plane.x, view.up_plane.y, view.up_plane.z, view.right_plane.x, view.right_plane.y, view.right_plane.z);
 	view.right_plane = vector_normalize(view.right_plane);		
 	view.up_plane = vector_normalize(view.up_plane);	
 	float step_px = virtual_view_size / MINIMUM(view.size_px.x, view.size_px.y);
@@ -86,10 +86,12 @@ float3 ViewBase::camera_zoom(int pixels) {
 }
 
 float3 ViewBase::set_camera_position(float distance, float vert_angle, float horiz_angle) {
-	cam_distance = distance;
-	cam_angles.y = DEG_TO_RAD(vert_angle);
-	cam_angles.x = DEG_TO_RAD(horiz_angle);
-	return compute_camera_position();
+	cam_distance = 0;
+	cam_angles.y = 0;
+	cam_angles.x = 0;
+	camera_down(vert_angle);
+	camera_right(horiz_angle);
+	return camera_zoom(distance);
 }
 
 void ViewBase::toggle_perspective() {
