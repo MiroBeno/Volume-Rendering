@@ -198,19 +198,23 @@ void display_callback(void) {
 }
 
 void idle_callback(){
-	if (auto_rotate_vector.x != 0 && mouse_state.w == GLUT_UP)
-		view_base.camera_right(auto_rotate_vector.x);
-	if (auto_rotate_vector.y != 0 && mouse_state.w == GLUT_UP) 
-		view_base.camera_down(auto_rotate_vector.y);
+	if (mouse_state.w == GLUT_UP || mouse_state.z != GLUT_LEFT_BUTTON) {
+		if (auto_rotate_vector.x != 0)
+			view_base.camera_right(auto_rotate_vector.x);
+		if (auto_rotate_vector.y != 0) 
+			view_base.camera_down(auto_rotate_vector.y);
+	}
     draw_volume();
 }
 
 void timer_callback(int value) {
 	//printf("Timer ticked...\n");
-	if (auto_rotate_vector.x != 0 && mouse_state.w == GLUT_UP)
-		view_base.camera_right(auto_rotate_vector.x);
-	if (auto_rotate_vector.y != 0 && mouse_state.w == GLUT_UP) 
-		view_base.camera_down(auto_rotate_vector.y);
+	if (mouse_state.w == GLUT_UP || mouse_state.z != GLUT_LEFT_BUTTON) {
+		if (auto_rotate_vector.x != 0)
+			view_base.camera_right(auto_rotate_vector.x);
+		if (auto_rotate_vector.y != 0) 
+			view_base.camera_down(auto_rotate_vector.y);
+	}
 	draw_volume();
 	glutTimerFunc(TIMER_MSECS, timer_callback, 0);
 }
@@ -221,11 +225,13 @@ void mouse_callback(int button, int state, int x, int y) {
 	mouse_state.y = y;
 	mouse_state.z = button;
 	mouse_state.w = state;
-	if (state == GLUT_DOWN) 
-		auto_rotate_vector = make_int2(0, 0);
-	if (state == GLUT_UP) {
-		if (abs(auto_rotate_vector.x) < 8 && abs(auto_rotate_vector.y) < 8)
+	if (button == GLUT_LEFT_BUTTON) {
+		if (state == GLUT_DOWN) 
 			auto_rotate_vector = make_int2(0, 0);
+		if (state == GLUT_UP) {
+			if (abs(auto_rotate_vector.x) < 8 && abs(auto_rotate_vector.y) < 8)
+				auto_rotate_vector = make_int2(0, 0);
+		}
 	}
 }
 
@@ -394,7 +400,7 @@ int main(int argc, char **argv) {
 		raycaster_base.transfer_fn[i] = make_float4(i <= 85 ? (i*3)/255.0f : 0.0f, 
 										(i > 85) && (i <= 170) ? ((i-85)*3)/255.0f : 0.0f, 
 										i > 170 ? ((i-170)*3)/255.0f : 0.0f, 
-										i/255.0f);
+										i > 20 ? i/255.0f : 0.0f);
 	}
 
 	renderers[0] = new CPURenderer(window_size, raycaster_base.transfer_fn, model_base.volume, model_base.data);
