@@ -4,12 +4,13 @@
 Raycaster RaycasterBase::raycaster = {	
 							Model(),
 							View(),
+							NULL,
 							0.06f,
 							0.95f,
 							0.0f
 						};
 
-float4 RaycasterBase::transfer_fn[256];
+
 
 void RaycasterBase::change_tf_offset(float offset, bool reset) {
 	raycaster.tf_offset = CLAMP(reset ? offset : raycaster.tf_offset + offset, 0, 0.9f);
@@ -26,9 +27,9 @@ void RaycasterBase::change_ray_threshold(float threshold, bool reset) {
 	printf("Ray accumulation threshold: %.3f\n", raycaster.ray_threshold);
 }
 
-void RaycasterBase::set_volume(Model model) {
-	raycaster.model = model;
-	int max_size = MAXIMUM(model.dims.x, MAXIMUM(model.dims.y, model.dims.z));
+void RaycasterBase::set_volume(Model volume) {
+	raycaster.volume = volume;
+	int max_size = MAXIMUM(volume.dims.x, MAXIMUM(volume.dims.y, volume.dims.z));
 	raycaster.ray_step = 2.0f / max_size;  // dlzka najvacsej hrany je 2 
 	raycaster.ray_step -= raycaster.ray_step / max_size;
 }

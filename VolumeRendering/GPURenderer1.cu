@@ -11,10 +11,10 @@ dim3 GPURenderer::num_blocks(0, 0);
 
 static float4 *transfer_fn = NULL;
 
-GPURenderer1::GPURenderer1(int2 size, float4 *tf, Model volume, unsigned char *d) {
-	set_window_buffer(size);
-	set_transfer_fn(tf);
-	set_volume(volume, d);
+GPURenderer1::GPURenderer1(Raycaster r) {
+	set_window_buffer(r.view);
+	set_transfer_fn(r);
+	set_volume(r.volume);
 }
 
 GPURenderer1::~GPURenderer1() {
@@ -23,7 +23,7 @@ GPURenderer1::~GPURenderer1() {
 	cuda_safe_call(cudaFree(transfer_fn));
 }
 
-__global__ void render_ray(Raycaster raycaster, uchar4 dev_buffer[], unsigned char dev_volume_data[], float4 transfer_fn[]) {
+__global__ void render_ray(Raycaster raycaster, uchar4 dev_buffer[]) {
 	int2 pos = {blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y};
 	if ((pos.x >= raycaster.view.size_px.x) || (pos.y >= raycaster.view.size_px.y))	// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
 		return;
@@ -35,7 +35,7 @@ __global__ void render_ray(Raycaster raycaster, uchar4 dev_buffer[], unsigned ch
 		float4 color_acc = {0, 0, 0, 0};
 		for (float k = k_range.x; k <= k_range.y; k += raycaster.ray_step) {		
 			float3 pt = origin + (direction * k);
-			float4 color_cur = raycaster.sample_color(dev_volume_data, transfer_fn, pt);
+			float4 color_cur = raycaster.sample_color(raycaster.transfer_fn, pt);
 			color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
 			if (color_acc.w > raycaster.ray_threshold) 
 				break;
@@ -44,32 +44,35 @@ __global__ void render_ray(Raycaster raycaster, uchar4 dev_buffer[], unsigned ch
 	}
 }
 
-void GPURenderer1::set_transfer_fn(float4 *tf) {
+void GPURenderer1::set_transfer_fn(Raycaster r) {
 	if (transfer_fn == NULL)
 		cuda_safe_call(cudaMalloc((void **)&transfer_fn, 256 * sizeof(float4)));
-	cuda_safe_call(cudaMemcpy(transfer_fn, tf, 256 * sizeof(float4), cudaMemcpyHostToDevice));
+	cuda_safe_call(cudaMemcpy(transfer_fn, r.transfer_fn, 256 * sizeof(float4), cudaMemcpyHostToDevice));
 }
 
-void GPURenderer1::set_window_buffer(int2 size) {
+void GPURenderer1::set_window_buffer(View view) {
 	if (dev_buffer != NULL)
 		cuda_safe_call(cudaFree(dev_buffer));
-	dev_buffer_size = size.x * size.y * 4;
+	dev_buffer_size = view.size_px.x * view.size_px.y * 4;
 	cuda_safe_call(cudaMalloc((void **)&dev_buffer, dev_buffer_size));
-	num_blocks = dim3((size.x + THREADS_PER_BLOCK.x - 1) / THREADS_PER_BLOCK.x, 
-					  (size.y + THREADS_PER_BLOCK.y - 1) / THREADS_PER_BLOCK.y);		
+	num_blocks = dim3((view.size_px.x + THREADS_PER_BLOCK.x - 1) / THREADS_PER_BLOCK.x, 
+					  (view.size_px.y + THREADS_PER_BLOCK.y - 1) / THREADS_PER_BLOCK.y);		
 			// celociselne delenie, ak su rozmery okna nedelitelne 16, spustaju sa bloky s nevyuzitimi threadmi
 }
 
-void GPURenderer1::set_volume(Model volume, unsigned char *d) {
+void GPURenderer1::set_volume(Model volume) {
 	if (dev_volume_data != NULL)
 		cuda_safe_call(cudaFree(dev_volume_data));
 	cuda_safe_call(cudaMalloc((void **)&dev_volume_data, volume.size));
-	cuda_safe_call(cudaMemcpy(dev_volume_data, d, volume.size, cudaMemcpyHostToDevice));
+	cuda_safe_call(cudaMemcpy(dev_volume_data, volume.data, volume.size, cudaMemcpyHostToDevice));
 }
 
-int GPURenderer1::render_volume(uchar4 *buffer, Raycaster *r) {
+int GPURenderer1::render_volume(uchar4 *buffer, Raycaster r) {
+	r.volume.data = dev_volume_data;
+	r.transfer_fn = transfer_fn;
+
 	cuda_safe_call(cudaMemset(dev_buffer, 0, dev_buffer_size));
-	render_ray<<<num_blocks, THREADS_PER_BLOCK>>>(*r, dev_buffer, dev_volume_data, transfer_fn);
+	render_ray<<<num_blocks, THREADS_PER_BLOCK>>>(r, dev_buffer);
 	cuda_safe_check();
 	cuda_safe_call(cudaMemcpy(buffer, dev_buffer, dev_buffer_size, cudaMemcpyDeviceToHost));
 	return 0;

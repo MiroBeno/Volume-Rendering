@@ -1,19 +1,15 @@
 #include <string.h>
 #include "Renderer.h"		
 
-static float4 *transfer_fn;
-static unsigned char *volume_data;
-
 static uchar2 *esl_volume;
+static unsigned char *esl_volume_bool;
 static int esl_block_size = 8;
 static uint4 esl_size;
-//static bool esl_transfer_fn[256][256];
-static unsigned char esl_transfer_fn[256];
 
-CPURenderer::CPURenderer(int2 size, float4 *tf, Model volume, unsigned char *d) {
-	set_window_buffer(size);
-	set_transfer_fn(tf);
-	set_volume(volume, d);
+CPURenderer::CPURenderer(Raycaster r) {
+	set_window_buffer(r.view);
+	set_volume(r.volume);
+	set_transfer_fn(r);
 }
 
 	inline uchar2 sample_data_esl(float3 pos, Model volume) {
@@ -24,7 +20,15 @@ CPURenderer::CPURenderer(int2 size, float4 *tf, Model volume, unsigned char *d) 
 		];
 	}
 
-	inline float4 sample_color_esl(float3 pos, Model volume) {
+	inline unsigned char sample_data_esl_bool(float3 pos, Model volume) {
+		return esl_volume_bool[
+			(map_float_int((pos.z + 1)*0.5f, volume.dims.z) / esl_block_size) * esl_size.x * esl_size.y +
+			(map_float_int((pos.y + 1)*0.5f, volume.dims.y) / esl_block_size) * esl_size.x  +
+			(map_float_int((pos.x + 1)*0.5f, volume.dims.x) / esl_block_size)
+		];
+	}
+
+	inline float4 sample_color_esl(float3 pos, Model volume, float4 transfer_fn[]) {
 		unsigned char sample = sample_data_esl(pos, volume).y;
 		float4 color = transfer_fn[sample];  // (int)sample
 		color.x *= color.w;				// aplikovanie optickeho modelu pre kompoziciu (farba * alfa)
@@ -41,15 +45,13 @@ inline void render_ray(Raycaster raycaster, uchar4 buffer[], int2 pos) {
 		float4 color_acc = {0, 0, 0, 0};
 		for (float k = k_range.x; k <= k_range.y; k += raycaster.ray_step) {		
 			float3 pt = origin + (direction * k);
-			float4 color_cur = raycaster.sample_color(volume_data, transfer_fn, pt);
-			//float4 color_cur = sample_color_esl(pt, raycaster.model);
-			
+			float4 color_cur = raycaster.sample_color(raycaster.transfer_fn, pt);
+			//float4 color_cur = sample_color_esl(pt, raycaster.volume, raycaster.transfer_fn);
 			if (color_cur.w == 0) {
-				uchar2 esl_sample = sample_data_esl(pt, raycaster.model);
-				//if (esl_transfer_fn[esl_sample.x][esl_sample.y]) {
-				if (esl_transfer_fn[esl_sample.x] > esl_sample.y) {
-					int max_size = MAXIMUM(raycaster.model.dims.x, MAXIMUM(raycaster.model.dims.y, raycaster.model.dims.z));
+				if (sample_data_esl_bool(pt, raycaster.volume) == 1) {
+					int max_size = MAXIMUM(raycaster.volume.dims.x, MAXIMUM(raycaster.volume.dims.y, raycaster.volume.dims.z));
 					k +=  (2.0f * esl_block_size) / max_size;
+					//color_cur.x = 1; color_cur.y = 1; color_cur.z = 0; color_cur.w = 0.02f;
 				}
 				continue;
 			}
@@ -61,34 +63,36 @@ inline void render_ray(Raycaster raycaster, uchar4 buffer[], int2 pos) {
 	}
 }
 
-void CPURenderer::set_transfer_fn(float4 *tf) {
-	transfer_fn = tf;
-
+void CPURenderer::set_transfer_fn(Raycaster r) {
+	//minmax:
+	unsigned char esl_min_max[256];
 	for(int x = 0; x < 256; x++) {
-		esl_transfer_fn[x] = 255;
+		esl_min_max[x] = 255;
 		for(int y = x; y < 256; y++)
-			if (transfer_fn[y].w != 0) {
-				esl_transfer_fn[x] = y;
+			if (r.transfer_fn[y].w != 0) {
+				esl_min_max[x] = y;
 				break;
 			}
 	}
-/*
-	for(int x = 0; x < 256; x++) {
-		esl_transfer_fn[x][x] = (transfer_fn[x].w == 0);
-		for(int y = x + 1; y < 256; y++)
-			esl_transfer_fn[x][y] = (esl_transfer_fn[x][y-1]) ? (transfer_fn[y].w == 0) : false;
-	}
-*/
+	//bool:
+	for(unsigned int z = 0; z < esl_size.z; z++)
+		for(unsigned int y = 0; y < esl_size.y; y++)
+			for(unsigned int x = 0; x < esl_size.x; x++) {
+				unsigned int esl_index = z * esl_size.x * esl_size.y + y * esl_size.x + x;
+				esl_volume_bool[esl_index] = (esl_min_max[esl_volume[esl_index].x] > esl_volume[esl_index].y) ? 1 : 0;
+			}
 }
 
-void CPURenderer::set_volume(Model volume, unsigned char *d) {
-	volume_data = d;
+void CPURenderer::set_volume(Model volume) {
 
-	if (esl_volume != NULL)
+	if (esl_volume != NULL) {
 		free(esl_volume);
+		free(esl_volume_bool);
+	}
 	esl_size = make_uint4(volume.dims.x / esl_block_size + 1, volume.dims.y / esl_block_size + 1, volume.dims.z / esl_block_size + 1, 0);
 	esl_size.w = esl_size.x * esl_size.y * esl_size.z;
 	esl_volume = (uchar2*) malloc(esl_size.w * sizeof(uchar2));
+	esl_volume_bool = (unsigned char*) malloc(esl_size.w * sizeof(unsigned char));
 	for(unsigned int i = 0; i < esl_size.w; i++) {
 		esl_volume[i].x = 255;
 		esl_volume[i].y = 0;
@@ -96,7 +100,7 @@ void CPURenderer::set_volume(Model volume, unsigned char *d) {
 	for(unsigned int z = 0; z < volume.dims.z; z++)
 		for(unsigned int y = 0; y < volume.dims.y; y++)
 			for(unsigned int x = 0; x < volume.dims.x; x++) {
-				unsigned char sample = volume_data[z * volume.dims.x * volume.dims.y + y * volume.dims.x + x];
+				unsigned char sample = volume.data[z * volume.dims.x * volume.dims.y + y * volume.dims.x + x];
 				unsigned int esl_index = (z / esl_block_size) * esl_size.x * esl_size.y + (y / esl_block_size) * esl_size.x + (x / esl_block_size);
 				if (esl_volume[esl_index].x > sample)
 					esl_volume[esl_index].x = sample;
@@ -105,11 +109,11 @@ void CPURenderer::set_volume(Model volume, unsigned char *d) {
 			}
 }
 
-int CPURenderer::render_volume(uchar4 *buffer, Raycaster *r) {
-	memset(buffer, 0, r->view.size_px.x * r->view.size_px.y * 4);
-	for(int row = 0; row < r->view.size_px.y; row++)
-		for(int col = 0; col < r->view.size_px.x; col++)	{
-			render_ray(*r, buffer, make_int2(col, row));
+int CPURenderer::render_volume(uchar4 *buffer, Raycaster r) {
+	memset(buffer, 0, r.view.size_px.x * r.view.size_px.y * 4);
+	for(int row = 0; row < r.view.size_px.y; row++)
+		for(int col = 0; col < r.view.size_px.x; col++)	{
+			render_ray(r, buffer, make_int2(col, row));
 		}
 	return 0;
 }

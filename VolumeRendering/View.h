@@ -13,10 +13,10 @@ struct View {
 	float3 direction;  
 	float3 right_plane;
 	float3 up_plane; 
-	bool perspective_ray;
+	bool perspective;
 
 	__host__ __device__ void get_ray(int2 pos, float3 *origin_vector, float3 *direction_vector) {
-		if (perspective_ray) {
+		if (perspective) {
 			*origin_vector = origin;
 			*direction_vector = direction + (right_plane * (float) (pos.x - half_px.x));
 			*direction_vector = *direction_vector + (up_plane * (float) (pos.y - half_px.y));

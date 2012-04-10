@@ -10,21 +10,21 @@ class Renderer {
 	public:
 		virtual ~Renderer() {
 			};
-		virtual void set_window_buffer(int2 size) {
+		virtual void set_window_buffer(View view) {
 			};
-		virtual void set_transfer_fn(float4 *tf) {
+		virtual void set_transfer_fn(Raycaster r) {
 			};
-		virtual void set_volume(Model volume, unsigned char *d) {
+		virtual void set_volume(Model volume) {
 			};
-		virtual int render_volume(uchar4 *buffer, Raycaster *r) = 0;
+		virtual int render_volume(uchar4 *buffer, Raycaster r) = 0;
 };
 
 class CPURenderer: public Renderer {
 	public:
-		CPURenderer(int2 size, float4 *tf, Model volume, unsigned char *d);
-		virtual void set_transfer_fn(float4 *tf);
-		virtual void set_volume(Model volume, unsigned char *d);
-		virtual int render_volume(uchar4 *buffer, Raycaster *r);
+		CPURenderer(Raycaster r);
+		virtual void set_transfer_fn(Raycaster r);
+		virtual void set_volume(Model volume);
+		virtual int render_volume(uchar4 *buffer, Raycaster r);
 };
 
 class GPURenderer: public Renderer {
@@ -38,34 +38,34 @@ class GPURenderer: public Renderer {
 
 class GPURenderer1: public GPURenderer {
 	public:
-		GPURenderer1(int2 size, float4 *tf, Model volume, unsigned char *d);
+		GPURenderer1(Raycaster r);
 		virtual ~GPURenderer1();
-		virtual void set_window_buffer(int2 size);
-		virtual void set_transfer_fn(float4 *tf);
-		virtual void set_volume(Model volume, unsigned char *d);
-		virtual int render_volume(uchar4 *buffer, Raycaster *r);
+		virtual void set_window_buffer(View view);
+		virtual void set_transfer_fn(Raycaster r);
+		virtual void set_volume(Model volume);
+		virtual int render_volume(uchar4 *buffer, Raycaster r);
 };
 
 class GPURenderer2: public GPURenderer {
 	public:
-		GPURenderer2(int2 size, float4 *tf, Model volume, unsigned char *d);
-		virtual void set_transfer_fn(float4 *tf);
-		virtual int render_volume(uchar4 *buffer, Raycaster *r);
+		GPURenderer2(Raycaster r);
+		virtual void set_transfer_fn(Raycaster r);
+		virtual int render_volume(uchar4 *buffer, Raycaster r);
 };
 
 class GPURenderer3: public GPURenderer {
 	public:
-		GPURenderer3(int2 size, float4 *tf, Model volume, unsigned char *d);
-		virtual int render_volume(uchar4 *buffer, Raycaster *r);
+		GPURenderer3(Raycaster r);
+		virtual int render_volume(uchar4 *buffer, Raycaster r);
 };
 
 class GPURenderer4: public GPURenderer {
 	public:
-		GPURenderer4(int2 size, float4 *tf, Model volume, unsigned char *d);
+		GPURenderer4(Raycaster r);
 		virtual ~GPURenderer4();
-		virtual void set_transfer_fn(float4 *tf);
-		virtual void set_volume(Model volume, unsigned char *d);
-		virtual int render_volume(uchar4 *buffer, Raycaster *r);
+		virtual void set_transfer_fn(Raycaster r);
+		virtual void set_volume(Model volume);
+		virtual int render_volume(uchar4 *buffer, Raycaster r);
 };
 
 #endif

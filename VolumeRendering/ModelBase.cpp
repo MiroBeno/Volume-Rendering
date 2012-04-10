@@ -3,12 +3,12 @@
 #include <stdlib.h>
 #include "Model.h"
 
-Model ModelBase::volume = {	0,
+Model ModelBase::volume = {	NULL,
+							0,
 							{0, 0, 0},
 							{1, 1, 1}			
 							};
 
-unsigned char *ModelBase::data;
 float ModelBase::histogram[256];
 
 void ModelBase::compute_histogram() {
@@ -17,7 +17,7 @@ void ModelBase::compute_histogram() {
 	for (int i = 0; i<256; i++) 
 		int_histogram[i] = 0;
 	for (unsigned int i = 0; i<volume.size; i++)
-		int_histogram[data[i]]++;
+		int_histogram[volume.data[i]]++;
 	for (int i = 0; i<256; i++) {
 		histogram[i] = sqrt(sqrt((float)int_histogram[i]));
 		if (histogram[i] > max_value)
@@ -43,8 +43,10 @@ int ModelBase::load_model(const char* file_name) {
 		unsigned char *description, *courtesy, *parameters, *comment;
 		loaded_data = readPVMvolume(file_name, &width, &height, &depth, 
 			&components, &scale_x, &scale_y, &scale_z, &description, &courtesy, &parameters, &comment);
-		if (loaded_data == NULL) 
+		if (loaded_data == NULL) { 
+			fprintf(stderr, "Error: File not found: %s\n", file_name);
 			return 1;
+		}
 		printf("PVM file volume metadata:\nDimensions: width = %d height = %d depth = %d components = %d\n",
 			width, height, depth, components);
 		if (scale_x!=1.0f || scale_y!=1.0f || scale_z!=1.0f)
@@ -65,8 +67,10 @@ int ModelBase::load_model(const char* file_name) {
 	if (strcmp(dot, supported_ext[0]) == 0) {
 		printf("Reading RAW file...\n");
 		loaded_data = readRAWfile(file_name, &size);
-		if (loaded_data == NULL) 
+		if (loaded_data == NULL) { 
+			fprintf(stderr, "Error: File not found: %s\n", file_name);
 			return 1;
+		}
 		printf("Enter RAW file volume dimensions (width, height, depth): ");   
 		scanf("%d %d %d",&width, &height, &depth);
 		if (width * height * depth != size) {
@@ -90,7 +94,7 @@ int ModelBase::load_model(const char* file_name) {
 	}
 	volume.dims = make_uint3(width, height, depth);
 	volume.size = size;
-	data = loaded_data;
+	volume.data = loaded_data;
 	printf("File successfully loaded: %s, volume size: %.2f MB\n\n", file_name, volume.size / (float)(1024 * 1024));
 	compute_histogram();
 

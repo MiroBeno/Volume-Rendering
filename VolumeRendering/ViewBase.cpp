@@ -96,12 +96,9 @@ float3 ViewBase::set_camera_position(float distance, float vert_angle, float hor
 }
 
 void ViewBase::toggle_perspective() {
-	view.perspective_ray = !view.perspective_ray;
-	if (view.perspective_ray) 
-		virtual_view_size = 1.5f;
-	else 
-		virtual_view_size = 3.0f;
-	printf("Perspective rays: %s\n", view.perspective_ray ? "on" : "off");
+	view.perspective = !view.perspective;
+	virtual_view_size = view.perspective ? 1.5f : 3.0f;
+	printf("Perspective rays: %s\n", view.perspective ? "on" : "off");
 	update_view();
 }
 

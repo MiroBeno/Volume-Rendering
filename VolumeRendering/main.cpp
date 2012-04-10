@@ -99,15 +99,15 @@ void draw_volume() {
 	if (window_resize_flag) {
 		reset_PBO_texture();
 		glViewport(0, 0, window_size.x, window_size.y);
-		for (int i=0; i < RENDERERS_COUNT; i++)
-			renderers[i]->set_window_buffer(window_size);
 		view_base.set_window_size(window_size);
+		for (int i=0; i < RENDERERS_COUNT; i++)
+			renderers[i]->set_window_buffer(view_base.view);
 		window_resize_flag = false;
 	}
 	raycaster_base.raycaster.view = view_base.view;
 	uchar4 *pbo_array = prepare_PBO();
 	cuda_safe_call(cudaEventRecord(start, 0));
-	renderers[renderer_id]->render_volume(pbo_array, &raycaster_base.raycaster);
+	renderers[renderer_id]->render_volume(pbo_array, raycaster_base.raycaster);
 	cuda_safe_call(cudaEventRecord(stop, 0));
 	cuda_safe_call(cudaEventSynchronize(stop));
 	cuda_safe_call(cudaEventElapsedTime(&elapsed_time.x, start, stop));
@@ -175,7 +175,8 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		delete_PBO_texture();
 		for (int i = RENDERERS_COUNT - 1; i >=0 ; i--)
 			delete renderers[i];
-		free(model_base.data);
+		free(model_base.volume.data);
+		free(raycaster_base.raycaster.transfer_fn);
 		glutDestroyWindow(window_id);
 		exit(0);
 	}
@@ -267,7 +268,7 @@ void reshape_callback(int w, int h) {
 void display_callback_sub(void) {
 	//printf("Drawing subwindow...\n");
 	glClear(GL_COLOR_BUFFER_BIT);	
-	float4 *tf = raycaster_base.transfer_fn;
+	float4 *tf = raycaster_base.raycaster.transfer_fn;
 	glBegin(GL_QUAD_STRIP);
 	for (int i=0; i <= 255; i++) {
 		glColor4f(tf[i].x, tf[i].y, tf[i].z, 1.0f);
@@ -303,13 +304,13 @@ void motion_callback_sub(int x, int y) {
 		}
 		if (mouse_state.z != GLUT_LEFT_BUTTON) 
 			intensity = 0;
-		raycaster_base.transfer_fn[sample].w = intensity;
+		raycaster_base.raycaster.transfer_fn[sample].w = intensity;
 	}
 	mouse_state.x = x;
 	mouse_state.y = y;
 	glutPostRedisplay();
 	for (int i=0; i < RENDERERS_COUNT; i++)
-		renderers[i]->set_transfer_fn(raycaster_base.transfer_fn);
+		renderers[i]->set_transfer_fn(raycaster_base.raycaster);
 }
 
 void mouse_callback_sub(int button, int state, int x, int y) {
@@ -322,7 +323,6 @@ void mouse_callback_sub(int button, int state, int x, int y) {
 int main(int argc, char **argv) {
 
 	if (model_base.load_model(FILE_NAME) != 0) {
-		fprintf(stderr, "File error: %s\n", FILE_NAME);
 		exit(EXIT_FAILURE);
 	}
 
@@ -365,15 +365,15 @@ int main(int argc, char **argv) {
 
 	GLenum err = glewInit();
 	if (GLEW_OK != err) {
-		fprintf(stderr, "Error initializing GLEW: %s\n", glewGetErrorString(err));
+		fprintf(stderr, "Error: Initializing GLEW failed: %s\n", glewGetErrorString(err));
 		glutDestroyWindow(window_id);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	printf("Using GLEW %s\n\n", glewGetString(GLEW_VERSION));
 	if (!GLEW_VERSION_2_0) {
-		printf("Error: OpenGL 2.0 is not supported.\n");
+		printf("Error: OpenGL 2.0 is not supported\n");
 		glutDestroyWindow(window_id);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	printf("Use '`1234' to change renderer\n    'wasd' and '7890' to manipulate camera position\n");
@@ -381,11 +381,78 @@ int main(int argc, char **argv) {
 	printf("    'nm' to change ray accumulation threshold\n    'r' to toggle autorotation\n");
 	printf("    '-' to toggle perspective and orthogonal projection\n\n");
 
-	cudaDeviceProp prop;
-	memset(&prop, 0, sizeof(cudaDeviceProp));
-	prop.major = 1;
-	prop.major = 0;
-	cuda_safe_call(cudaChooseDevice(&gpu_id, &prop));
+        
+    int device_count = 0;
+	cuda_safe_call(cudaGetDeviceCount(&device_count));
+	if (device_count == 0) {
+		printf("Error: No device supporting CUDA found\n");
+		exit(EXIT_FAILURE);
+	}
+	printf("Number of CUDA devices found: %d\n", device_count);
+  
+	cudaDeviceProp device_prop;
+	int max_compute_perf = 0, max_perf_device = -1, best_arch = 0;
+	for (int i = 0; i < device_count; i++) {
+		cuda_safe_call(cudaGetDeviceProperties(&device_prop, i));
+		if ((!device_prop.tccDriver) &&
+			(device_prop.major > 0 && device_prop.major < 9999)) 
+				best_arch = MAXIMUM(best_arch, device_prop.major);
+	}
+	for (int i = 0; i < device_count; i++) {
+		cuda_safe_call(cudaGetDeviceProperties(&device_prop, i));
+		if ((device_prop.major == 9999 && device_prop.minor == 9999) 
+			|| (device_prop.tccDriver)
+			|| (device_prop.major != best_arch))
+			continue;
+		int cores_per_mp = 0;
+		switch (device_prop.major) {
+			case 1: cores_per_mp = 8; break;
+			case 2: switch (device_prop.minor) {
+						case 1: cores_per_mp = 32; break;
+						case 2: cores_per_mp = 48; break;
+					}
+					break;
+			case 3: cores_per_mp = 192; break;
+		}
+		int compute_perf = device_prop.multiProcessorCount * cores_per_mp * device_prop.clockRate;
+		if (compute_perf > max_compute_perf) {
+			max_compute_perf = compute_perf;
+			max_perf_device  = i;
+		}
+	}
+	gpu_id = max_perf_device;
+
+    cuda_safe_call(cudaGetDeviceProperties(&device_prop, gpu_id));
+    printf("\nUsing device %d: \"%s\"\n", gpu_id, device_prop.name);
+	int version = 0;
+	cuda_safe_call(cudaDriverGetVersion(&version));
+	printf("  CUDA Driver Version:                      %d.%d\n", version/1000, version%100);
+	cuda_safe_call(cudaRuntimeGetVersion(&version));
+	printf("  CUDA Runtime Version:                     %d.%d\n", version/1000, version%100);
+    printf("  CUDA Capability version number:           %d.%d\n", device_prop.major, device_prop.minor);
+	int cores_per_mp = 0;
+	switch (device_prop.major) {
+		case 1: cores_per_mp = 8; break;
+		case 2: switch (device_prop.minor) {
+					case 1: cores_per_mp = 32; break;
+					case 2: cores_per_mp = 48; break;
+				}
+				break;
+		case 3: cores_per_mp = 192; break;
+	}
+	if (cores_per_mp != 0)
+		printf("  Multiprocessors x Cores/MP = Cores:       %d (MP) x %d (Cores/MP) = %d (Cores)\n", 
+			device_prop.multiProcessorCount,
+			cores_per_mp,
+			cores_per_mp * device_prop.multiProcessorCount);
+	printf("  Total amount of global memory:            %llu bytes\n", (unsigned long long) device_prop.totalGlobalMem);
+	printf("  Total amount of constant memory:          %u bytes\n", device_prop.totalConstMem); 
+	printf("  Total amount of shared memory per block:  %u bytes\n", device_prop.sharedMemPerBlock);
+	printf("  Total number of registers per block:	    %d\n", device_prop.regsPerBlock);
+	printf("  Clock rate:                               %.2f GHz\n", device_prop.clockRate * 1e-6f);
+	printf("  Integrated:                               %s\n", device_prop.integrated ? "Yes" : "No");
+	printf("\n");
+
 	cuda_safe_call(cudaGLSetGLDevice(gpu_id));
 	cuda_safe_call(cudaEventCreate(&start));
 	cuda_safe_call(cudaEventCreate(&stop));
@@ -394,22 +461,25 @@ int main(int argc, char **argv) {
 
 	reset_PBO_texture();
 
+	raycaster_base.raycaster.view = view_base.view;
 	raycaster_base.set_volume(model_base.volume);
 
+	raycaster_base.raycaster.transfer_fn = (float4 *) malloc(256 * sizeof(float4));
+
 	for (int i =0; i < 256; i++) {
-		raycaster_base.transfer_fn[i] = make_float4(i <= 85 ? (i*3)/255.0f : 0.0f, 
+		raycaster_base.raycaster.transfer_fn[i] = make_float4(i <= 85 ? (i*3)/255.0f : 0.0f, 
 										(i > 85) && (i <= 170) ? ((i-85)*3)/255.0f : 0.0f, 
 										i > 170 ? ((i-170)*3)/255.0f : 0.0f, 
 										i > 20 ? i/255.0f : 0.0f);
 	}
 
-	renderers[0] = new CPURenderer(window_size, raycaster_base.transfer_fn, model_base.volume, model_base.data);
-	renderers[1] = new GPURenderer1(window_size, raycaster_base.transfer_fn, model_base.volume, model_base.data);
-	renderers[2] = new GPURenderer2(window_size, raycaster_base.transfer_fn, model_base.volume, model_base.data);
-	renderers[3] = new GPURenderer3(window_size, raycaster_base.transfer_fn, model_base.volume, model_base.data);
-	renderers[4] = new GPURenderer4(window_size, raycaster_base.transfer_fn, model_base.volume, model_base.data);
+	renderers[0] = new CPURenderer(raycaster_base.raycaster);	
+	renderers[1] = new GPURenderer1(raycaster_base.raycaster);
+	renderers[2] = new GPURenderer2(raycaster_base.raycaster);
+	renderers[3] = new GPURenderer3(raycaster_base.raycaster);
+	renderers[4] = new GPURenderer4(raycaster_base.raycaster);
 
-	//printf("Raycaster data size: %i B\n",sizeof(Raycaster));
+	printf("Raycaster data size: %i B\n", sizeof(Raycaster));
 	glutMainLoop();
 	return EXIT_FAILURE;
 }
