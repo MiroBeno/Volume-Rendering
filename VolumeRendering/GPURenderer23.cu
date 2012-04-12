@@ -19,7 +19,7 @@ GPURenderer3::GPURenderer3(Raycaster r) {
 }
 
 __global__ void render_ray(uchar4 dev_buffer[], unsigned char dev_volume_data[]) {
-	int2 pos = {blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y};
+	short2 pos = {blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y};
 	if ((pos.x >= raycaster.view.size_px.x) || (pos.y >= raycaster.view.size_px.y))	// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
 		return;
 

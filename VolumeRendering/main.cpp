@@ -13,6 +13,7 @@
 #include "cuda_utils.h"
 #include "cuda_gl_interop.h"
 
+
 const char *APP_NAME = "VR:";
 const int TIMER_MSECS = 1;
 const int RENDERERS_COUNT = 5;
@@ -22,7 +23,7 @@ const char *FILE_NAME = "VisMale.pvm";					// 128x256x256 x 8bit
 //const char *FILE_NAME = "Bonsai1.pvm";					// 512x512x182 x 16 bit
 
 static int window_id, subwindow_id;
-static int2 window_size = {INT_WIN_WIDTH, INT_WIN_HEIGHT};
+static ushort2 window_size = {INT_WIN_WIDTH, INT_WIN_HEIGHT};
 static bool window_resize_flag = false;
 static GLuint pbo_gl_id = NULL;
 static GLuint tex_gl_id = NULL;
@@ -30,12 +31,12 @@ static GLuint tex_gl_id = NULL;
 static int gpu_id;
 static cudaGraphicsResource *pbo_cuda_id;
 
-static int4 mouse_state = make_int4(0, 0, 0, GLUT_UP);
-static int2 auto_rotate_vector = {0, 0};
+static short4 mouse_state = {0, 0, 0, GLUT_UP};
+static short2 auto_rotate_vector = {0, 0};
 
-cudaEvent_t start, stop, frame; 
-float2 elapsed_time = {0, 0};
-char title_string[256];
+static cudaEvent_t start, stop, frame; 
+static float2 elapsed_time = {0, 0};
+static char title_string[256];
 
 static int renderer_id = 1;
 static Renderer *renderers[RENDERERS_COUNT];
@@ -97,6 +98,8 @@ void draw_volume() {
 	//printf("Drawing volume...\n");
 	glutSetWindow(window_id);
 	if (window_resize_flag) {
+		if (window_size.x == 0 || window_size.y == 0)
+			return;
 		reset_PBO_texture();
 		glViewport(0, 0, window_size.x, window_size.y);
 		view_base.set_window_size(window_size);
@@ -129,8 +132,6 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		case 'e': view_base.camera_zoom(-0.1f); break;
 		case 'o': raycaster_base.change_ray_step(0.01f, false); break;
 		case 'p': raycaster_base.change_ray_step(-0.01f, false); break;
-		case 'k': raycaster_base.change_tf_offset(0.025f, false); break;
-		case 'l': raycaster_base.change_tf_offset(-0.025f, false); break;
 		case 'n': raycaster_base.change_ray_threshold(0.05f, false); break;
 		case 'm': raycaster_base.change_ray_threshold(-0.05f, false); break;
 		case '-': view_base.toggle_perspective(); break;
@@ -139,15 +140,16 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		case '2': renderer_id = 2; break;
 		case '3': renderer_id = 3; break;
 		case '4': renderer_id = 4; break;
+		case '7': view_base.set_camera_position(3,-45,-45); break;
 		case '8': view_base.set_camera_position(3,0,0); break;
 		case '9': view_base.set_camera_position(3,-90,0); break;
 		case '0': view_base.set_camera_position(3,180,-90); break;
 		case 'r':	if (auto_rotate_vector.x == 0 && auto_rotate_vector.y == 0) {
-						auto_rotate_vector = make_int2(-5, -5);
+						auto_rotate_vector = make_short2(-5, -5);
 						printf("Autorotation: on\n");
 					}
 					else {
-						auto_rotate_vector = make_int2(0, 0);
+						auto_rotate_vector = make_short2(0, 0);
 						printf("Autorotation: off\n");
 					}
 					break;
@@ -209,7 +211,6 @@ void idle_callback(){
 }
 
 void timer_callback(int value) {
-	//printf("Timer ticked...\n");
 	if (mouse_state.w == GLUT_UP || mouse_state.z != GLUT_LEFT_BUTTON) {
 		if (auto_rotate_vector.x != 0)
 			view_base.camera_right(auto_rotate_vector.x);
@@ -228,10 +229,10 @@ void mouse_callback(int button, int state, int x, int y) {
 	mouse_state.w = state;
 	if (button == GLUT_LEFT_BUTTON) {
 		if (state == GLUT_DOWN) 
-			auto_rotate_vector = make_int2(0, 0);
+			auto_rotate_vector = make_short2(0, 0);
 		if (state == GLUT_UP) {
 			if (abs(auto_rotate_vector.x) < 8 && abs(auto_rotate_vector.y) < 8)
-				auto_rotate_vector = make_int2(0, 0);
+				auto_rotate_vector = make_short2(0, 0);
 		}
 	}
 }
@@ -257,7 +258,7 @@ void reshape_callback(int w, int h) {
 		window_size.y = h;
 		window_resize_flag = true;
 	}
-	if (window_size.x != 0 && window_size.y != 0) {
+	if (window_size.x > 8 && window_size.y > 8) {
 		glutSetWindow(subwindow_id);
 		glutPositionWindow(window_size.x/20, (window_size.y/20)*17);
 		glutReshapeWindow((window_size.x*18)/20, window_size.y/8);
@@ -309,6 +310,7 @@ void motion_callback_sub(int x, int y) {
 	mouse_state.x = x;
 	mouse_state.y = y;
 	glutPostRedisplay();
+	raycaster_base.update_esl_volume();
 	for (int i=0; i < RENDERERS_COUNT; i++)
 		renderers[i]->set_transfer_fn(raycaster_base.raycaster);
 }
@@ -336,8 +338,8 @@ int main(int argc, char **argv) {
 	glutKeyboardFunc(keyboard_callback);
 	glutMouseFunc(mouse_callback);
     glutMotionFunc(motion_callback);
-	//glutTimerFunc(1, timer_callback, 0);
-	glutIdleFunc(idle_callback);
+	glutTimerFunc(1, timer_callback, 0);
+	//glutIdleFunc(idle_callback);
 	glutReshapeFunc(reshape_callback);
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_TEXTURE_2D);
@@ -377,7 +379,7 @@ int main(int argc, char **argv) {
 	}
 
 	printf("Use '`1234' to change renderer\n    'wasd' and '7890' to manipulate camera position\n");
-	printf("    'op' to change ray sampling rate\n    'kl' to change transfer function offset\n");
+	printf("    'op' to change ray sampling rate\n");
 	printf("    'nm' to change ray accumulation threshold\n    'r' to toggle autorotation\n");
 	printf("    '-' to toggle perspective and orthogonal projection\n\n");
 
@@ -461,11 +463,6 @@ int main(int argc, char **argv) {
 
 	reset_PBO_texture();
 
-	raycaster_base.raycaster.view = view_base.view;
-	raycaster_base.set_volume(model_base.volume);
-
-	raycaster_base.raycaster.transfer_fn = (float4 *) malloc(256 * sizeof(float4));
-
 	for (int i =0; i < 256; i++) {
 		raycaster_base.raycaster.transfer_fn[i] = make_float4(i <= 85 ? (i*3)/255.0f : 0.0f, 
 										(i > 85) && (i <= 170) ? ((i-85)*3)/255.0f : 0.0f, 
@@ -473,12 +470,15 @@ int main(int argc, char **argv) {
 										i > 20 ? i/255.0f : 0.0f);
 	}
 
+	raycaster_base.raycaster.view = view_base.view;
+	raycaster_base.set_volume(model_base.volume);
+
 	renderers[0] = new CPURenderer(raycaster_base.raycaster);	
 	renderers[1] = new GPURenderer1(raycaster_base.raycaster);
 	renderers[2] = new GPURenderer2(raycaster_base.raycaster);
 	renderers[3] = new GPURenderer3(raycaster_base.raycaster);
 	renderers[4] = new GPURenderer4(raycaster_base.raycaster);
-
+	
 	printf("Raycaster data size: %i B\n", sizeof(Raycaster));
 	glutMainLoop();
 	return EXIT_FAILURE;

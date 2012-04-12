@@ -2,7 +2,6 @@
 #include "View.h"
 
 View ViewBase::view = {	{INT_WIN_WIDTH, INT_WIN_HEIGHT}, 
-						{INT_WIN_WIDTH / 2, INT_WIN_HEIGHT / 2}, 
 						{3, 0, 0},
 						{-1, 0, 0},
 						make_float3(0, 0, -1) * (3.0f / MINIMUM(INT_WIN_WIDTH, INT_WIN_HEIGHT)),
@@ -102,12 +101,10 @@ void ViewBase::toggle_perspective() {
 	update_view();
 }
 
-void ViewBase::set_window_size(int2 px) {
+void ViewBase::set_window_size(ushort2 px) {
 	view.size_px = px; 
-	view.half_px.x = px.x / 2; 
-	view.half_px.y = px.y / 2;
 	cam_pixel_delta.x = 180.0f / (MINIMUM(px.x, px.y));
-	cam_pixel_delta.y = (distance_limits.y - distance_limits.x) / view.half_px.y;
+	cam_pixel_delta.y = (distance_limits.y - distance_limits.x) / (view.size_px.y / 2);
 	update_view();
 }
 

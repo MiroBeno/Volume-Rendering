@@ -10,6 +10,7 @@ dim3 GPURenderer::THREADS_PER_BLOCK(16, 16);				// pocet threadov v bloku - podl
 dim3 GPURenderer::num_blocks(0, 0);
 
 static float4 *transfer_fn = NULL;
+static unsigned char *esl_volume = NULL;
 
 GPURenderer1::GPURenderer1(Raycaster r) {
 	set_window_buffer(r.view);
@@ -21,10 +22,11 @@ GPURenderer1::~GPURenderer1() {
 	cuda_safe_call(cudaFree(dev_buffer));
 	cuda_safe_call(cudaFree(dev_volume_data));
 	cuda_safe_call(cudaFree(transfer_fn));
+	cuda_safe_call(cudaFree(esl_volume));
 }
 
 __global__ void render_ray(Raycaster raycaster, uchar4 dev_buffer[]) {
-	int2 pos = {blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y};
+	short2 pos = {blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y};
 	if ((pos.x >= raycaster.view.size_px.x) || (pos.y >= raycaster.view.size_px.y))	// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
 		return;
 
@@ -33,9 +35,13 @@ __global__ void render_ray(Raycaster raycaster, uchar4 dev_buffer[]) {
 	raycaster.view.get_ray(pos, &origin, &direction); 
 	if (raycaster.intersect(origin, direction, &k_range)) {	
 		float4 color_acc = {0, 0, 0, 0};
-		for (float k = k_range.x; k <= k_range.y; k += raycaster.ray_step) {		
-			float3 pt = origin + (direction * k);
+		for (; k_range.x <= k_range.y; k_range.x += raycaster.ray_step) {		
+			float3 pt = origin + (direction * k_range.x);
 			float4 color_cur = raycaster.sample_color(raycaster.transfer_fn, pt);
+			if (color_cur.w == 0) {
+				raycaster.leap_empty_space(pt, origin, direction, &k_range);
+				continue;
+			}
 			color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
 			if (color_acc.w > raycaster.ray_threshold) 
 				break;
@@ -45,9 +51,12 @@ __global__ void render_ray(Raycaster raycaster, uchar4 dev_buffer[]) {
 }
 
 void GPURenderer1::set_transfer_fn(Raycaster r) {
-	if (transfer_fn == NULL)
+	if (transfer_fn == NULL) 
 		cuda_safe_call(cudaMalloc((void **)&transfer_fn, 256 * sizeof(float4)));
+	if (esl_volume == NULL) 
+		cuda_safe_call(cudaMalloc((void **)&esl_volume, r.esl_volume_dims.x * r.esl_volume_dims.y * r.esl_volume_dims.z * sizeof(unsigned char)));
 	cuda_safe_call(cudaMemcpy(transfer_fn, r.transfer_fn, 256 * sizeof(float4), cudaMemcpyHostToDevice));
+	cuda_safe_call(cudaMemcpy(esl_volume, r.esl_volume, r.esl_volume_dims.x * r.esl_volume_dims.y * r.esl_volume_dims.z * sizeof(unsigned char), cudaMemcpyHostToDevice));
 }
 
 void GPURenderer1::set_window_buffer(View view) {
@@ -70,6 +79,7 @@ void GPURenderer1::set_volume(Model volume) {
 int GPURenderer1::render_volume(uchar4 *buffer, Raycaster r) {
 	r.volume.data = dev_volume_data;
 	r.transfer_fn = transfer_fn;
+	r.esl_volume = esl_volume;
 
 	cuda_safe_call(cudaMemset(dev_buffer, 0, dev_buffer_size));
 	render_ray<<<num_blocks, THREADS_PER_BLOCK>>>(r, dev_buffer);

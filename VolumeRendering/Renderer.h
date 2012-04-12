@@ -22,8 +22,6 @@ class Renderer {
 class CPURenderer: public Renderer {
 	public:
 		CPURenderer(Raycaster r);
-		virtual void set_transfer_fn(Raycaster r);
-		virtual void set_volume(Model volume);
 		virtual int render_volume(uchar4 *buffer, Raycaster r);
 };
 

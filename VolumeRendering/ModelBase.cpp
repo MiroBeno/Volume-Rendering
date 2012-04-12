@@ -28,7 +28,7 @@ void ModelBase::compute_histogram() {
 }
 
 int ModelBase::load_model(const char* file_name) {
-
+	//free predosly
     const char *dot = strrchr(file_name, '.');
 	const char supported_ext[2][10] = {".raw", ".pvm"};
 	if (!dot || (strcmp(dot, supported_ext[0]) != 0 && strcmp(dot, supported_ext[1]) != 0)) {
@@ -92,7 +92,7 @@ int ModelBase::load_model(const char* file_name) {
 		printf("Quantizing 16 bit volume to 8 bit using a non-linear mapping...\n");
 		loaded_data = quantize(loaded_data, width, height, depth);
 	}
-	volume.dims = make_uint3(width, height, depth);
+	volume.dims = make_ushort3(width, height, depth);
 	volume.size = size;
 	volume.data = loaded_data;
 	printf("File successfully loaded: %s, volume size: %.2f MB\n\n", file_name, volume.size / (float)(1024 * 1024));
