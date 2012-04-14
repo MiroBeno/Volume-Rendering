@@ -112,8 +112,14 @@
 			/>
 			<Tool
 				Name="Cudart Build Rule"
+				NvccCompilation="0"
+				Arch1="12"
 				Arch2="0"
-				PtxAsOptionV="false"
+				MaxRegCount="32"
+				PtxAsOptionV="true"
+				Keep="false"
+				Warning="3"
+				Optimization="2"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"

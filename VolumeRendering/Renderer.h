@@ -30,6 +30,7 @@ class GPURenderer: public Renderer {
 		static uchar4 *dev_buffer;
 		static int dev_buffer_size;
 		static unsigned char *dev_volume_data;
+		//static unsigned char *esl_volume;
 		static dim3 THREADS_PER_BLOCK;				
 		static dim3 num_blocks;
 };

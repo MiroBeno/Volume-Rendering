@@ -4,7 +4,8 @@
 #include "Renderer.h"
 
 static __constant__ Raycaster raycaster;
-//static __constant__ float4 transfer_fn[256];
+//static __constant__ float4 transfer_fn[TF_SIZE];
+static __constant__ unsigned char esl_volume[ESL_VOLUME_SIZE];
 
 cudaArray *volume_array = 0;
 texture<unsigned char, 3, cudaReadModeNormalizedFloat> volume_texture;
@@ -27,14 +28,14 @@ GPURenderer4::~GPURenderer4() {
 __device__ float4 sample_color_texture(float3 pos) {
 	float sample = tex3D(volume_texture, (pos.x + 1)*0.5f, (pos.y + 1)*0.5f, (pos.z + 1)*0.5f);
 	float4 color = tex1D(transfer_fn_texture, sample);
-	//float4 color = transfer_fn[int(sample*255)]; 
+	//float4 color = transfer_fn[int(sample*(TF_SIZE-1))]; 
 	color.x *= color.w;				// aplikovanie optickeho modelu pre kompoziciu (farba * alfa)
 	color.y *= color.w;
 	color.z *= color.w;
 	return color;
 }
 
-__global__ void render_ray(uchar4 dev_buffer[]) {
+static __global__ void render_ray(uchar4 dev_buffer[]) {
 	short2 pos = {blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y};
 	if ((pos.x >= raycaster.view.size_px.x) || (pos.y >= raycaster.view.size_px.y))	// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
 		return;
@@ -43,9 +44,15 @@ __global__ void render_ray(uchar4 dev_buffer[]) {
 	float2 k_range;
 	raycaster.view.get_ray(pos, &origin, &direction); 
 	if (raycaster.intersect(origin, direction, &k_range)) {	
+		float3 pt = origin + (direction * k_range.x);
+		for(; k_range.x <= k_range.y; k_range.x += raycaster.ray_step, pt = origin + (direction * k_range.x)) {
+			if (raycaster.esl && raycaster.sample_data_esl(esl_volume, pt)) 
+				raycaster.leap_empty_space(pt, direction, &k_range);
+			else 
+				break;
+		}
 		float4 color_acc = {0, 0, 0, 0};
-		for (float k = k_range.x; k <= k_range.y; k += raycaster.ray_step) {		
-			float3 pt = origin + (direction * k);
+		for (; k_range.x <= k_range.y; k_range.x += raycaster.ray_step, pt = origin + (direction * k_range.x)) {		
 			float4 color_cur = sample_color_texture(pt);
 			color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
 			if (color_acc.w > raycaster.ray_threshold) 
@@ -58,8 +65,8 @@ __global__ void render_ray(uchar4 dev_buffer[]) {
 void GPURenderer4::set_transfer_fn(Raycaster r) {
 	if (transfer_fn_array == 0) {
 		cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<float4>();
-		cuda_safe_call(cudaMallocArray(&transfer_fn_array, &channelDesc, 256, 1)); 
-		cuda_safe_call(cudaMemcpyToArray(transfer_fn_array, 0, 0, r.transfer_fn, 256 * sizeof(float4), cudaMemcpyHostToDevice));
+		cuda_safe_call(cudaMallocArray(&transfer_fn_array, &channelDesc, TF_SIZE, 1)); 
+		cuda_safe_call(cudaMemcpyToArray(transfer_fn_array, 0, 0, r.transfer_fn, TF_SIZE * sizeof(float4), cudaMemcpyHostToDevice));
 
 		transfer_fn_texture.filterMode = cudaFilterModeLinear; 
 		transfer_fn_texture.normalized = true;
@@ -67,9 +74,10 @@ void GPURenderer4::set_transfer_fn(Raycaster r) {
 		cuda_safe_call(cudaBindTextureToArray(transfer_fn_texture, transfer_fn_array, channelDesc));
 	}
 	else {
-		cuda_safe_call(cudaMemcpyToArray(transfer_fn_array, 0, 0, r.transfer_fn, 256 * sizeof(float4), cudaMemcpyHostToDevice));
-		//cuda_safe_call(cudaMemcpyToSymbol(transfer_fn, r.transfer_fn, 256 * sizeof(float4)));
+		cuda_safe_call(cudaMemcpyToArray(transfer_fn_array, 0, 0, r.transfer_fn, TF_SIZE * sizeof(float4), cudaMemcpyHostToDevice));
+		//cuda_safe_call(cudaMemcpyToSymbol(transfer_fn, r.transfer_fn, TF_SIZE * sizeof(float4)));
 	}
+	cuda_safe_call(cudaMemcpyToSymbol(esl_volume, r.esl_volume, ESL_VOLUME_SIZE * sizeof(unsigned char)));
 }
 
 void GPURenderer4::set_volume(Model volume) {

@@ -17,10 +17,10 @@
 const char *APP_NAME = "VR:";
 const int TIMER_MSECS = 1;
 const int RENDERERS_COUNT = 5;
-//const char *FILE_NAME = "Bucky.pvm";						// 32x32x32 x 8bit
+const char *FILE_NAME = "Bucky.pvm";						// 32x32x32 x 8bit
 //const char *FILE_NAME = "Foot.pvm";						// 256x256x256 x 8bit
-const char *FILE_NAME = "VisMale.pvm";					// 128x256x256 x 8bit
-//const char *FILE_NAME = "Bonsai1.pvm";					// 512x512x182 x 16 bit
+//const char *FILE_NAME = "VisMale.pvm";					// 128x256x256 x 8bit
+//const char *FILE_NAME = "Bonsai1-LO.pvm";					// 512x512x182 x 16 bit
 
 static int window_id, subwindow_id;
 static ushort2 window_size = {INT_WIN_WIDTH, INT_WIN_HEIGHT};
@@ -134,6 +134,7 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		case 'p': raycaster_base.change_ray_step(-0.01f, false); break;
 		case 'n': raycaster_base.change_ray_threshold(0.05f, false); break;
 		case 'm': raycaster_base.change_ray_threshold(-0.05f, false); break;
+		case 'l': raycaster_base.toggle_esl(); break;
 		case '-': view_base.toggle_perspective(); break;
 		case '`': renderer_id = 0; break;
 		case '1': renderer_id = 1; break;
@@ -179,6 +180,8 @@ void keyboard_callback(unsigned char key, int x, int y) {
 			delete renderers[i];
 		free(model_base.volume.data);
 		free(raycaster_base.raycaster.transfer_fn);
+		free(raycaster_base.raycaster.esl_min_max);
+		free(raycaster_base.raycaster.esl_volume);
 		glutDestroyWindow(window_id);
 		exit(0);
 	}
@@ -271,16 +274,16 @@ void display_callback_sub(void) {
 	glClear(GL_COLOR_BUFFER_BIT);	
 	float4 *tf = raycaster_base.raycaster.transfer_fn;
 	glBegin(GL_QUAD_STRIP);
-	for (int i=0; i <= 255; i++) {
+	for (int i=0; i < TF_SIZE; i++) {
 		glColor4f(tf[i].x, tf[i].y, tf[i].z, 1.0f);
-		glVertex2f(i, 0);
-		glVertex2f(i, sqrt(sqrt(tf[i].w)));
+		glVertex2f(i*2, 0);
+		glVertex2f(i*2, sqrt(sqrt(tf[i].w)));
 	}
 	glEnd();
 	glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glBegin(GL_QUAD_STRIP);
-	for (int i=0; i <= 255; i++) {
+	for (int i=0; i < 256; i++) {
 		glColor4f(1, 1, 1, 0.9f);
 		glVertex2f(i, 0);
 		glColor4f(1, 1, 1, 0.1f);
@@ -297,7 +300,7 @@ void motion_callback_sub(int x, int y) {
 	int x_delta = mouse_state.x < x ? 1 : -1;
 	float y_delta = (steps == 0) ? 0 : (y - mouse_state.y) / (float)steps;
 	for (int i = 0; i <= steps; i++) {
-		int sample = CLAMP((int)((mouse_state.x + i * x_delta) / (win_width / 256)), 0, 255);
+		int sample = CLAMP((int)((mouse_state.x + i * x_delta) / (win_width / TF_SIZE)), 0, (TF_SIZE-1));
 		float intensity;
 		if (mouse_state.z == GLUT_LEFT_BUTTON) {
 			intensity = CLAMP(1.0f - (mouse_state.y + i * y_delta) / win_height, 0, 1.0f);
@@ -338,8 +341,8 @@ int main(int argc, char **argv) {
 	glutKeyboardFunc(keyboard_callback);
 	glutMouseFunc(mouse_callback);
     glutMotionFunc(motion_callback);
-	glutTimerFunc(1, timer_callback, 0);
-	//glutIdleFunc(idle_callback);
+	//glutTimerFunc(1, timer_callback, 0);
+	glutIdleFunc(idle_callback);
 	glutReshapeFunc(reshape_callback);
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_TEXTURE_2D);
@@ -463,11 +466,11 @@ int main(int argc, char **argv) {
 
 	reset_PBO_texture();
 
-	for (int i =0; i < 256; i++) {
-		raycaster_base.raycaster.transfer_fn[i] = make_float4(i <= 85 ? (i*3)/255.0f : 0.0f, 
-										(i > 85) && (i <= 170) ? ((i-85)*3)/255.0f : 0.0f, 
-										i > 170 ? ((i-170)*3)/255.0f : 0.0f, 
-										i > 20 ? i/255.0f : 0.0f);
+	for (int i =0; i < TF_SIZE; i++) {
+		raycaster_base.raycaster.transfer_fn[i] = make_float4(i <= TF_SIZE/3 ? (i*3)/128.0f : 0.0f, 
+										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? ((i-TF_SIZE/3)*3)/128.0f : 0.0f, 
+										i > TF_SIZE/3*2 ? ((i-TF_SIZE/3*2)*3)/128.0f : 0.0f, 
+										i > 10 ? i/128.0f : 0.0f);
 	}
 
 	raycaster_base.raycaster.view = view_base.view;

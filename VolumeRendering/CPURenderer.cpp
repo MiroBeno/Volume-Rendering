@@ -11,23 +11,21 @@ inline void render_ray(Raycaster raycaster, uchar4 buffer[], short2 pos) {
 	float3 origin, direction;
 	float2 k_range;
 	raycaster.view.get_ray(pos, &origin, &direction); 
-	if (raycaster.intersect(origin, direction, &k_range))	{	
+	if (raycaster.intersect(origin, direction, &k_range)) {	
+		float3 pt = origin + (direction * k_range.x);
+		for(; k_range.x <= k_range.y; k_range.x += raycaster.ray_step, pt = origin + (direction * k_range.x)) {
+			if (raycaster.esl && raycaster.sample_data_esl(raycaster.esl_volume, pt)) 
+				raycaster.leap_empty_space(pt, direction, &k_range);
+			else 
+				break;
+		}
 		float4 color_acc = {0, 0, 0, 0};
-		/**///int steps = 0;
-		for (; k_range.x <= k_range.y; k_range.x += raycaster.ray_step) {
-			/**///steps++;
-			float3 pt = origin + (direction * k_range.x);
+		for (; k_range.x <= k_range.y; k_range.x += raycaster.ray_step, pt = origin + (direction * k_range.x)) {		
 			float4 color_cur = raycaster.sample_color(raycaster.transfer_fn, pt);
-			//float4 color_cur = raycaster.sample_color_min_max(pt);
-			if (color_cur.w == 0) {
-				raycaster.leap_empty_space(pt, origin, direction, &k_range);
-				continue;
-			}
 			color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
 			if (color_acc.w > raycaster.ray_threshold) 
 				break;
 		}
-		/**///color_acc = make_float4(steps / 255.0f, 0, 0, 1);
 		raycaster.write_color(color_acc, pos, buffer);
 	}
 }

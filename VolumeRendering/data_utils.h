@@ -33,7 +33,7 @@ inline __host__ __device__ float3 operator*(float3 a, float b)
     return make_float3(a.x * b, a.y * b, a.z * b);
 }
 
-inline __host__ __device__ float3 operator*(float3 a, int3 b)
+inline __host__ __device__ float3 operator*(float3 a, ushort3 b)
 {
     return make_float3(a.x * b.x, a.y * b.y, a.z * b.z);
 }
