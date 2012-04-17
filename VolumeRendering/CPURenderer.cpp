@@ -7,7 +7,7 @@ CPURenderer::CPURenderer(Raycaster r) {
 	set_transfer_fn(r);
 }
 
-inline void render_ray(Raycaster raycaster, uchar4 buffer[], short2 pos) {
+inline static void render_ray(Raycaster raycaster, uchar4 buffer[], short2 pos) {
 	float3 origin, direction;
 	float2 k_range;
 	raycaster.view.get_ray(pos, &origin, &direction); 

@@ -10,7 +10,7 @@ Raycaster RaycasterBase::raycaster = {
 							false,
 							(unsigned char*) malloc(ESL_VOLUME_SIZE * sizeof(unsigned char)),
 							(uchar2*) malloc(ESL_VOLUME_SIZE * 8 * sizeof(uchar2)),
-							ESL_INT_BLOCK_SIZE
+							ESL_MIN_BLOCK_SIZE
 						};
 
 void RaycasterBase::change_ray_step(float step, bool reset) {
@@ -38,13 +38,17 @@ void RaycasterBase::update_esl_volume() {
 		}
 		esl_temp_tf[x] = y;
 	}
-	for(unsigned int i = 0; i < ESL_VOLUME_SIZE * 8; i++) {
-		if (esl_temp_tf[raycaster.esl_min_max[i].x/2] > raycaster.esl_min_max[i].y/2) {
+	/*for(unsigned int i = 0; i < ESL_VOLUME_SIZE * 8; i++) {
+		if (esl_temp_tf[raycaster.esl_min_max[i].x / TF_RATIO] > raycaster.esl_min_max[i].y / TF_RATIO)
 			raycaster.esl_volume[i/8] |= 1 << (i % 8);
-		}
-		else {
+		else 
 			raycaster.esl_volume[i/8]  &= ~(1 << (i % 8));
-		}
+	}*/
+	for(unsigned int i = 0; i < ESL_VOLUME_SIZE; i++) {
+		if (esl_temp_tf[raycaster.esl_min_max[i].x / TF_RATIO] > raycaster.esl_min_max[i].y / TF_RATIO)
+			raycaster.esl_volume[i] = 1;
+		else 
+			raycaster.esl_volume[i] = 0;
 	}
 }
 
@@ -55,9 +59,8 @@ void RaycasterBase::set_volume(Model volume) {
 	raycaster.ray_step -= raycaster.ray_step / max_size;
 
 	int max_dim = MAXIMUM(volume.dims.x, MAXIMUM(volume.dims.y, volume.dims.z));
-	float num_blocks = (float)(max_dim / ESL_INT_BLOCK_SIZE) / (float)(ESL_VOLUME_DIMS - 1);
-	if (num_blocks > 1)							// zvacsime o nasobky 8 ak sa nezmesti do konstantneho esl volume
-		raycaster.esl_block_dims = (unsigned short) (ceil(num_blocks) * ESL_INT_BLOCK_SIZE);
+	raycaster.esl_block_dims = (max_dim + ESL_VOLUME_DIMS - 1) / ESL_VOLUME_DIMS;
+	raycaster.esl_block_dims = MAXIMUM(ESL_MIN_BLOCK_SIZE, raycaster.esl_block_dims);
 
 	for(unsigned int i = 0; i < ESL_VOLUME_SIZE * 8; i++) {
 		raycaster.esl_min_max[i].x = 255;

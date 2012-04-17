@@ -43,6 +43,8 @@ static __global__ void render_ray(Raycaster raycaster, uchar4 dev_buffer[]) {
 				break;
 		}
 		float4 color_acc = {0, 0, 0, 0};
+		/*if (k_range.x > k_range.y) return;
+		color_acc = color_acc + (make_float4(0.5f, 0.5f, 1, 0.5f) * (1 - color_acc.w));*/
 		for (; k_range.x <= k_range.y; k_range.x += raycaster.ray_step, pt = origin + (direction * k_range.x)) {		
 			float4 color_cur = raycaster.sample_color(raycaster.transfer_fn, pt);
 			color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)

@@ -17,9 +17,9 @@
 const char *APP_NAME = "VR:";
 const int TIMER_MSECS = 1;
 const int RENDERERS_COUNT = 5;
-const char *FILE_NAME = "Bucky.pvm";						// 32x32x32 x 8bit
+//const char *FILE_NAME = "Bucky.pvm";						// 32x32x32 x 8bit
 //const char *FILE_NAME = "Foot.pvm";						// 256x256x256 x 8bit
-//const char *FILE_NAME = "VisMale.pvm";					// 128x256x256 x 8bit
+const char *FILE_NAME = "VisMale.pvm";					// 128x256x256 x 8bit
 //const char *FILE_NAME = "Bonsai1-LO.pvm";					// 512x512x182 x 16 bit
 
 static int window_id, subwindow_id;
@@ -276,8 +276,8 @@ void display_callback_sub(void) {
 	glBegin(GL_QUAD_STRIP);
 	for (int i=0; i < TF_SIZE; i++) {
 		glColor4f(tf[i].x, tf[i].y, tf[i].z, 1.0f);
-		glVertex2f(i*2, 0);
-		glVertex2f(i*2, sqrt(sqrt(tf[i].w)));
+		glVertex2f(i, 0);
+		glVertex2f(i, sqrt(sqrt(tf[i].w)));
 	}
 	glEnd();
 	glEnable(GL_BLEND);
@@ -285,9 +285,9 @@ void display_callback_sub(void) {
 	glBegin(GL_QUAD_STRIP);
 	for (int i=0; i < 256; i++) {
 		glColor4f(1, 1, 1, 0.9f);
-		glVertex2f(i, 0);
+		glVertex2f(i / (float)TF_RATIO, 0);
 		glColor4f(1, 1, 1, 0.1f);
-		glVertex2f(i, model_base.histogram[i]);
+		glVertex2f(i / (float)TF_RATIO, model_base.histogram[i]);
 	}
 	glEnd();
 	glDisable(GL_BLEND);
@@ -363,7 +363,7 @@ int main(int argc, char **argv) {
 	glLoadIdentity();
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	glOrtho(0.0, 255.0, 0.0, 1.0, 0.0, 1.0);
+	glOrtho(0.0, TF_SIZE - 1, 0.0, 1.0, 0.0, 1.0);
 	glClearColor(0, 0, 0, 1);
 
 	glutSetWindow(window_id);
@@ -467,10 +467,10 @@ int main(int argc, char **argv) {
 	reset_PBO_texture();
 
 	for (int i =0; i < TF_SIZE; i++) {
-		raycaster_base.raycaster.transfer_fn[i] = make_float4(i <= TF_SIZE/3 ? (i*3)/128.0f : 0.0f, 
-										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? ((i-TF_SIZE/3)*3)/128.0f : 0.0f, 
-										i > TF_SIZE/3*2 ? ((i-TF_SIZE/3*2)*3)/128.0f : 0.0f, 
-										i > 10 ? i/128.0f : 0.0f);
+		raycaster_base.raycaster.transfer_fn[i] = make_float4(i <= TF_SIZE/3 ? (i*3)/(float)(TF_SIZE) : 0.0f, 
+										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? ((i-TF_SIZE/3)*3)/(float)(TF_SIZE) : 0.0f, 
+										i > TF_SIZE/3*2 ? ((i-TF_SIZE/3*2)*3)/(float)(TF_SIZE) : 0.0f, 
+										i > (20/TF_RATIO) ? i/(float)(TF_SIZE) : 0.0f);
 	}
 
 	raycaster_base.raycaster.view = view_base.view;

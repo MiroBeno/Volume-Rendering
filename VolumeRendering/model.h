@@ -8,7 +8,7 @@ struct Model {
 	unsigned char *data;
 	unsigned int size;
 	ushort3 dims;		
-	float3 bound;
+	float3 min_bound;
 
 	__host__ __device__ unsigned char sample_data(float3 pos) {
 		return data[
