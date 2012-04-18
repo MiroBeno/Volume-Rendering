@@ -26,15 +26,6 @@ struct Raycaster {
 	float light_kd;
 	float light_ks;
 
-	__host__ __device__ float4 sample_color(float4 transfer_fn[], float3 pos) {
-		unsigned char sample = volume.sample_data(pos);
-		float4 color = transfer_fn[sample / TF_RATIO];  // (int)sample
-		color.x *= color.w;				// aplikovanie optickeho modelu pre kompoziciu (farba * alfa)
-		color.y *= color.w;
-		color.z *= color.w;
-		return color;
-	}
-
 	__host__ __device__ bool intersect(float3 pt, float3 dir, float2 *k) {  // mozne odchylky pri vypocte => hodnoty k mimo volume; riesi sa clampovanim vysledku na stenu
 		float3 k1 = (volume.min_bound - pt) / dir;			// ak je zlozka vektora rovnobezna s osou a teda so stenou kocky (dir == 0), tak
 		float3 k2 = (-volume.min_bound - pt) / dir;				// ak lezi bod v romedzi kocky v danej osi je vysledok (-oo; +oo), inak (-oo;-oo) alebo (+oo;+oo) 
@@ -112,11 +103,12 @@ struct Raycaster {
 class RaycasterBase {
 	public:
 		static Raycaster raycaster;
+		static float4 base_transfer_fn[TF_SIZE];
 		static void change_ray_step(float step, bool reset);
 		static void change_ray_threshold(float threshold, bool reset);
 		static void toggle_esl();
 		static void set_volume(Model volume);
-		static void update_esl_volume();
+		static void update_transfer_fn();
 };
 
 #endif

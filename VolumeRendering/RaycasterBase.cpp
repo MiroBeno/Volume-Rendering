@@ -16,6 +16,8 @@ Raycaster RaycasterBase::raycaster = {
 							0.2f
 						};
 
+float4 RaycasterBase::base_transfer_fn[TF_SIZE];
+
 void RaycasterBase::change_ray_step(float step, bool reset) {
 	raycaster.ray_step = CLAMP(reset ? step : raycaster.ray_step + step, 0.001f, 1);
 	printf("Ray sampling step: %.4f (approx %.1f sampling points)\n", raycaster.ray_step, 2/raycaster.ray_step);
@@ -31,7 +33,13 @@ void RaycasterBase::toggle_esl() {
 	printf("Empty space leaping: %s\n", raycaster.esl ? "on" : "off");
 }
 
-void RaycasterBase::update_esl_volume() {
+void RaycasterBase::update_transfer_fn() {
+	for (int i = 0; i < TF_SIZE; i++) {					// pre-multiplikacia tf
+		raycaster.transfer_fn[i].x = base_transfer_fn[i].x * base_transfer_fn[i].w;
+		raycaster.transfer_fn[i].y = base_transfer_fn[i].y * base_transfer_fn[i].w;
+		raycaster.transfer_fn[i].z = base_transfer_fn[i].z * base_transfer_fn[i].w;
+		raycaster.transfer_fn[i].w = base_transfer_fn[i].w;
+	}
 	unsigned short esl_temp_tf[TF_SIZE];		// pomocne pole rozsahov indexov transfer_fn, ktore maju 0 opacity
 	int x, y;
 	for(x = 0; x < TF_SIZE; x++) {				
@@ -87,6 +95,6 @@ void RaycasterBase::set_volume(Model volume) {
 		2.0f * raycaster.esl_block_dims / volume.dims.y,
 		2.0f * raycaster.esl_block_dims / volume.dims.z
 	);
-	update_esl_volume();
+	update_transfer_fn();
 }
 

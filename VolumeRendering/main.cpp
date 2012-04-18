@@ -211,7 +211,7 @@ void idle_callback(){
 		if (auto_rotate_vector.y != 0) 
 			ViewBase::camera_down(auto_rotate_vector.y);
 	}
-	//ViewBase::light_down(20);
+	ViewBase::light_down(20);
     draw_volume();
 }
 
@@ -278,7 +278,7 @@ void reshape_callback(int w, int h) {
 void display_callback_sub(void) {
 	//printf("Drawing subwindow...\n");
 	glClear(GL_COLOR_BUFFER_BIT);	
-	float4 *tf = RaycasterBase::raycaster.transfer_fn;
+	float4 *tf = RaycasterBase::base_transfer_fn;
 	glBegin(GL_QUAD_STRIP);
 	for (int i=0; i < TF_SIZE; i++) {
 		glColor4f(tf[i].x, tf[i].y, tf[i].z, 1.0f);
@@ -314,12 +314,12 @@ void motion_callback_sub(int x, int y) {
 		}
 		if (mouse_state.z != GLUT_LEFT_BUTTON) 
 			intensity = 0;
-		RaycasterBase::raycaster.transfer_fn[sample].w = intensity;
+		RaycasterBase::base_transfer_fn[sample].w = intensity;
 	}
 	mouse_state.x = x;
 	mouse_state.y = y;
 	glutPostRedisplay();
-	RaycasterBase::update_esl_volume();
+	RaycasterBase::update_transfer_fn();
 	for (int i=0; i < RENDERERS_COUNT; i++)
 		renderers[i]->set_transfer_fn(RaycasterBase::raycaster);
 }
@@ -496,20 +496,15 @@ int main(int argc, char **argv) {
 
 	reset_PBO_texture();
 
-	/*for (int i =0; i < TF_SIZE; i++) {
-		RaycasterBase::raycaster.transfer_fn[i] = make_float4(i <= TF_SIZE/3 ? (i*3)/(float)(TF_SIZE) : 0.0f, 
+	for (int i =0; i < TF_SIZE; i++) {
+		RaycasterBase::base_transfer_fn[i] = make_float4(i <= TF_SIZE/3 ? (i*3)/(float)(TF_SIZE) : 0.0f, 
 										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? ((i-TF_SIZE/3)*3)/(float)(TF_SIZE) : 0.0f, 
 										i > TF_SIZE/3*2 ? ((i-TF_SIZE/3*2)*3)/(float)(TF_SIZE) : 0.0f, 
 										i > (20/TF_RATIO) ? i/(float)(TF_SIZE) : 0.0f);
-	}*/
-	//RaycasterBase::raycaster.transfer_fn[15] = make_float4(1,1,1,1);
-	for (int i =0; i < TF_SIZE; i++) {
-		RaycasterBase::raycaster.transfer_fn[i] = make_float4(
-										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? 0.23 : 0.0f, 
-										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? 0.23 : 0.0f, 
-										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? 0 : 0.0f, 
-										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? i/(float)(TF_SIZE) : 0.0f);
 	}
+	/*for (int i =0; i < TF_SIZE; i++) {
+		RaycasterBase::base_transfer_fn[i] = make_float4(0.23f, 0.23f, 0.0f, i/(float)TF_SIZE);
+	}*/
 
 	RaycasterBase::raycaster.view = ViewBase::view;
 	RaycasterBase::set_volume(ModelBase::volume);
