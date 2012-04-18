@@ -42,10 +42,6 @@ static int renderer_id = 1;
 static Renderer *renderers[RENDERERS_COUNT];
 static char renderer_names[RENDERERS_COUNT][256]= {"CPU", "CUDA Straightforward", "CUDA Constant Memory", "CUDA CM + GL interop", "CUDA CM + 3D Texture Memory + GLI"};
 
-static RaycasterBase raycaster_base;
-static ModelBase model_base;
-static ViewBase view_base;
-
 void delete_PBO_texture() {
     if (pbo_gl_id != NULL) {
 		cuda_safe_call(cudaGraphicsUnregisterResource(pbo_cuda_id));
@@ -102,15 +98,15 @@ void draw_volume() {
 			return;
 		reset_PBO_texture();
 		glViewport(0, 0, window_size.x, window_size.y);
-		view_base.set_window_size(window_size);
+		ViewBase::set_window_size(window_size);
 		for (int i=0; i < RENDERERS_COUNT; i++)
-			renderers[i]->set_window_buffer(view_base.view);
+			renderers[i]->set_window_buffer(ViewBase::view);
 		window_resize_flag = false;
 	}
-	raycaster_base.raycaster.view = view_base.view;
+	RaycasterBase::raycaster.view = ViewBase::view;
 	uchar4 *pbo_array = prepare_PBO();
 	cuda_safe_call(cudaEventRecord(start, 0));
-	renderers[renderer_id]->render_volume(pbo_array, raycaster_base.raycaster);
+	renderers[renderer_id]->render_volume(pbo_array, RaycasterBase::raycaster);
 	cuda_safe_call(cudaEventRecord(stop, 0));
 	cuda_safe_call(cudaEventSynchronize(stop));
 	cuda_safe_call(cudaEventElapsedTime(&elapsed_time.x, start, stop));
@@ -124,27 +120,32 @@ void draw_volume() {
 
 void keyboard_callback(unsigned char key, int x, int y) {
 	switch (key) {
-		case 'w': view_base.camera_down(-5.0f); break;
-		case 's': view_base.camera_down(5.0f); break;
-		case 'a': view_base.camera_right(-5.0f); break;
-		case 'd': view_base.camera_right(5.0f); break;
-		case 'q': view_base.camera_zoom(0.1f); break;
-		case 'e': view_base.camera_zoom(-0.1f); break;
-		case 'o': raycaster_base.change_ray_step(0.01f, false); break;
-		case 'p': raycaster_base.change_ray_step(-0.01f, false); break;
-		case 'n': raycaster_base.change_ray_threshold(0.05f, false); break;
-		case 'm': raycaster_base.change_ray_threshold(-0.05f, false); break;
-		case 'l': raycaster_base.toggle_esl(); break;
-		case '-': view_base.toggle_perspective(); break;
+		case 'w': ViewBase::camera_down(-5.0f); break;
+		case 's': ViewBase::camera_down(5.0f); break;
+		case 'a': ViewBase::camera_right(-5.0f); break;
+		case 'd': ViewBase::camera_right(5.0f); break;
+		case 'q': ViewBase::camera_zoom(0.1f); break;
+		case 'e': ViewBase::camera_zoom(-0.1f); break;
+		case 'o': RaycasterBase::change_ray_step(0.01f, false); break;
+		case 'p': RaycasterBase::change_ray_step(-0.01f, false); break;
+		case 'n': RaycasterBase::change_ray_threshold(0.05f, false); break;
+		case 'm': RaycasterBase::change_ray_threshold(-0.05f, false); break;
+		case 'l': RaycasterBase::toggle_esl(); break;
+		case '[': RaycasterBase::raycaster.light_kd -= 0.05; printf("kd: %.2f\n", RaycasterBase::raycaster.light_kd); break;
+		case ']': RaycasterBase::raycaster.light_kd += 0.05; printf("kd: %.2f\n", RaycasterBase::raycaster.light_kd); break;
+										
+		case ';':  RaycasterBase::raycaster.light_ks -= 0.05f; printf("ks: %.6f\n", RaycasterBase::raycaster.light_ks); break;
+		case '\'': RaycasterBase::raycaster.light_ks += 0.05f; printf("ks: %.6f\n", RaycasterBase::raycaster.light_ks); break;
+		case '-': ViewBase::toggle_perspective(); break;
 		case '`': renderer_id = 0; break;
 		case '1': renderer_id = 1; break;
 		case '2': renderer_id = 2; break;
 		case '3': renderer_id = 3; break;
 		case '4': renderer_id = 4; break;
-		case '7': view_base.set_camera_position(3,-45,-45); break;
-		case '8': view_base.set_camera_position(3,0,0); break;
-		case '9': view_base.set_camera_position(3,-90,0); break;
-		case '0': view_base.set_camera_position(3,180,-90); break;
+		case '7': ViewBase::set_camera_position(3,-45,-45); break;
+		case '8': ViewBase::set_camera_position(3,0,0); break;
+		case '9': ViewBase::set_camera_position(3,-90,0); break;
+		case '0': ViewBase::set_camera_position(3,180,-90); break;
 		case 'r':	if (auto_rotate_vector.x == 0 && auto_rotate_vector.y == 0) {
 						auto_rotate_vector = make_short2(-5, -5);
 						printf("Autorotation: on\n");
@@ -178,10 +179,10 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		delete_PBO_texture();
 		for (int i = RENDERERS_COUNT - 1; i >=0 ; i--)
 			delete renderers[i];
-		free(model_base.volume.data);
-		free(raycaster_base.raycaster.transfer_fn);
-		free(raycaster_base.raycaster.esl_min_max);
-		free(raycaster_base.raycaster.esl_volume);
+		free(ModelBase::volume.data);
+		free(RaycasterBase::raycaster.transfer_fn);
+		free(RaycasterBase::raycaster.esl_min_max);
+		free(RaycasterBase::raycaster.esl_volume);
 		glutDestroyWindow(window_id);
 		exit(0);
 	}
@@ -206,19 +207,20 @@ void display_callback(void) {
 void idle_callback(){
 	if (mouse_state.w == GLUT_UP || mouse_state.z != GLUT_LEFT_BUTTON) {
 		if (auto_rotate_vector.x != 0)
-			view_base.camera_right(auto_rotate_vector.x);
+			ViewBase::camera_right(auto_rotate_vector.x);
 		if (auto_rotate_vector.y != 0) 
-			view_base.camera_down(auto_rotate_vector.y);
+			ViewBase::camera_down(auto_rotate_vector.y);
 	}
+	//ViewBase::light_down(20);
     draw_volume();
 }
 
 void timer_callback(int value) {
 	if (mouse_state.w == GLUT_UP || mouse_state.z != GLUT_LEFT_BUTTON) {
 		if (auto_rotate_vector.x != 0)
-			view_base.camera_right(auto_rotate_vector.x);
+			ViewBase::camera_right(auto_rotate_vector.x);
 		if (auto_rotate_vector.y != 0) 
-			view_base.camera_down(auto_rotate_vector.y);
+			ViewBase::camera_down(auto_rotate_vector.y);
 	}
 	draw_volume();
 	glutTimerFunc(TIMER_MSECS, timer_callback, 0);
@@ -244,11 +246,15 @@ void motion_callback(int x, int y) {
 	if (mouse_state.z == GLUT_LEFT_BUTTON) {	  
 		auto_rotate_vector.x = x - mouse_state.x;
 		auto_rotate_vector.y = y - mouse_state.y;
-		view_base.camera_right(auto_rotate_vector.x); 
-		view_base.camera_down(auto_rotate_vector.y);
+		ViewBase::camera_right(auto_rotate_vector.x); 
+		ViewBase::camera_down(auto_rotate_vector.y);
 	}
 	if (mouse_state.z == GLUT_RIGHT_BUTTON) {	  
-		view_base.camera_zoom(y - mouse_state.y); 
+		ViewBase::camera_zoom(y - mouse_state.y); 
+	}
+	if (mouse_state.z == GLUT_MIDDLE_BUTTON) {	  
+		ViewBase::light_right(x - mouse_state.x); 
+		ViewBase::light_down(y - mouse_state.y);
 	}
 	mouse_state.x = x;
 	mouse_state.y = y;
@@ -272,7 +278,7 @@ void reshape_callback(int w, int h) {
 void display_callback_sub(void) {
 	//printf("Drawing subwindow...\n");
 	glClear(GL_COLOR_BUFFER_BIT);	
-	float4 *tf = raycaster_base.raycaster.transfer_fn;
+	float4 *tf = RaycasterBase::raycaster.transfer_fn;
 	glBegin(GL_QUAD_STRIP);
 	for (int i=0; i < TF_SIZE; i++) {
 		glColor4f(tf[i].x, tf[i].y, tf[i].z, 1.0f);
@@ -287,7 +293,7 @@ void display_callback_sub(void) {
 		glColor4f(1, 1, 1, 0.9f);
 		glVertex2f(i / (float)TF_RATIO, 0);
 		glColor4f(1, 1, 1, 0.1f);
-		glVertex2f(i / (float)TF_RATIO, model_base.histogram[i]);
+		glVertex2f(i / (float)TF_RATIO, ModelBase::histogram[i]);
 	}
 	glEnd();
 	glDisable(GL_BLEND);
@@ -308,14 +314,14 @@ void motion_callback_sub(int x, int y) {
 		}
 		if (mouse_state.z != GLUT_LEFT_BUTTON) 
 			intensity = 0;
-		raycaster_base.raycaster.transfer_fn[sample].w = intensity;
+		RaycasterBase::raycaster.transfer_fn[sample].w = intensity;
 	}
 	mouse_state.x = x;
 	mouse_state.y = y;
 	glutPostRedisplay();
-	raycaster_base.update_esl_volume();
+	RaycasterBase::update_esl_volume();
 	for (int i=0; i < RENDERERS_COUNT; i++)
-		renderers[i]->set_transfer_fn(raycaster_base.raycaster);
+		renderers[i]->set_transfer_fn(RaycasterBase::raycaster);
 }
 
 void mouse_callback_sub(int button, int state, int x, int y) {
@@ -327,7 +333,31 @@ void mouse_callback_sub(int button, int state, int x, int y) {
 
 int main(int argc, char **argv) {
 
-	if (model_base.load_model(FILE_NAME) != 0) {
+	for (int i = 1; i < argc; i++) {
+		char *arg = argv[i];
+		if (strncmp(arg, "-h", 2) == 0) {
+			printf("VolumeRendering.exe [-h]\n");
+			return 0;
+		} else if (strncmp(arg, "-size", 5) == 0) {
+			if (i + 2 >= argc) {
+				printf("Error: Not enough arguments.\n");
+				return EXIT_FAILURE;
+			}
+			int width = atoi(argv[++i]);
+			int height = atoi(argv[++i]);
+			if (width <= 0 || height <= 0) {
+				printf("Error: Non-positive size.\n");
+				return EXIT_FAILURE;
+			}
+			window_size.x = (unsigned short) width;
+			window_size.y = (unsigned short) height;
+			ViewBase::set_window_size(window_size);
+		} else {
+			printf("Warning: unknown argument: %s\n", arg);
+		}
+	}
+
+	if (ModelBase::load_model(FILE_NAME) != 0) {
 		exit(EXIT_FAILURE);
 	}
 
@@ -466,21 +496,29 @@ int main(int argc, char **argv) {
 
 	reset_PBO_texture();
 
-	for (int i =0; i < TF_SIZE; i++) {
-		raycaster_base.raycaster.transfer_fn[i] = make_float4(i <= TF_SIZE/3 ? (i*3)/(float)(TF_SIZE) : 0.0f, 
+	/*for (int i =0; i < TF_SIZE; i++) {
+		RaycasterBase::raycaster.transfer_fn[i] = make_float4(i <= TF_SIZE/3 ? (i*3)/(float)(TF_SIZE) : 0.0f, 
 										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? ((i-TF_SIZE/3)*3)/(float)(TF_SIZE) : 0.0f, 
 										i > TF_SIZE/3*2 ? ((i-TF_SIZE/3*2)*3)/(float)(TF_SIZE) : 0.0f, 
 										i > (20/TF_RATIO) ? i/(float)(TF_SIZE) : 0.0f);
+	}*/
+	//RaycasterBase::raycaster.transfer_fn[15] = make_float4(1,1,1,1);
+	for (int i =0; i < TF_SIZE; i++) {
+		RaycasterBase::raycaster.transfer_fn[i] = make_float4(
+										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? 0.23 : 0.0f, 
+										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? 0.23 : 0.0f, 
+										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? 0 : 0.0f, 
+										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? i/(float)(TF_SIZE) : 0.0f);
 	}
 
-	raycaster_base.raycaster.view = view_base.view;
-	raycaster_base.set_volume(model_base.volume);
+	RaycasterBase::raycaster.view = ViewBase::view;
+	RaycasterBase::set_volume(ModelBase::volume);
 
-	renderers[0] = new CPURenderer(raycaster_base.raycaster);	
-	renderers[1] = new GPURenderer1(raycaster_base.raycaster);
-	renderers[2] = new GPURenderer2(raycaster_base.raycaster);
-	renderers[3] = new GPURenderer3(raycaster_base.raycaster);
-	renderers[4] = new GPURenderer4(raycaster_base.raycaster);
+	renderers[0] = new CPURenderer(RaycasterBase::raycaster);	
+	renderers[1] = new GPURenderer1(RaycasterBase::raycaster);
+	renderers[2] = new GPURenderer2(RaycasterBase::raycaster);
+	renderers[3] = new GPURenderer3(RaycasterBase::raycaster);
+	renderers[4] = new GPURenderer4(RaycasterBase::raycaster);
 	
 	printf("Raycaster data size: %i B\n", sizeof(Raycaster));
 	glutMainLoop();

@@ -23,6 +23,8 @@ struct Raycaster {
 	uchar2 *esl_min_max;
 	unsigned short esl_block_dims;
 	float3 esl_block_size;
+	float light_kd;
+	float light_ks;
 
 	__host__ __device__ float4 sample_color(float4 transfer_fn[], float3 pos) {
 		unsigned char sample = volume.sample_data(pos);
@@ -95,6 +97,14 @@ struct Raycaster {
 		dk = MAXIMUM(dk, 0);
 		dk = floor(dk / ray_step) * ray_step;
 		k->x += dk;
+	}
+
+	__host__ __device__ float3 shade(float3 pt, float3 dir) {
+		float3 light_dir = vector_normalize(view.light_pos - pt);
+		float sample = volume.sample_data(pt) / 255.0f;
+		float sample_l = volume.sample_data(pt + light_dir * 0.01f) / 255.0f;
+		float diffuse_light = (sample_l - sample);
+		return make_float3(diffuse_light, diffuse_light, diffuse_light) * 0.6f;
 	}
 
 };

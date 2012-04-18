@@ -10,7 +10,8 @@ struct View {
 	float3 origin; 
 	float3 direction;  
 	float3 right_plane;
-	float3 up_plane; 
+	float3 up_plane;
+	float3 light_pos;
 	bool perspective;
 
 	__host__ __device__ void get_ray(short2 pos, float3 *origin_vector, float3 *direction_vector) {
@@ -31,24 +32,25 @@ struct View {
 class ViewBase {
 	public:
 		static View view;
-		static float3 camera_down(float angle);
-		static float3 camera_right(float angle);
-		static float3 camera_zoom(float distance);
-		static float3 camera_down(int pixels);
-		static float3 camera_right(int pixels);
-		static float3 camera_zoom(int pixels);
-		static float3 set_camera_position(float distance, float vert_angle, float horiz_angle);
+		static void camera_down(float angle);
+		static void camera_right(float angle);
+		static void camera_zoom(float distance);
+		static void camera_down(int pixels);
+		static void camera_right(int pixels);
+		static void camera_zoom(int pixels);
+		static void light_down(int pixels);
+		static void light_right(int pixels);
+		static void set_camera_position(float distance, float vert_angle, float horiz_angle);
 		static void toggle_perspective();
 		static void set_window_size(ushort2 px);
 	private:
 		static const float2 distance_limits;
-		static float2 cam_angles;
-		static float cam_distance;
 		static float3 cam_position;
+		static float3 light_position;
 		static float2 cam_pixel_delta;
 		static float virtual_view_size;
 		static void update_view();
-		static float3 compute_camera_position();
+		static float3 angles_to_point(float3 *angles);
 };
 
 #endif

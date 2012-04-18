@@ -4,7 +4,7 @@
 #include "Renderer.h"
 
 static __constant__ Raycaster raycaster;
-//static __constant__ float4 transfer_fn[TF_SIZE];
+static __constant__ float4 transfer_fn[TF_SIZE];
 //static __constant__ unsigned char esl_volume[ESL_VOLUME_SIZE];
 
 cudaArray *volume_array = 0;
@@ -39,12 +39,41 @@ __device__ float4 sample_color_texture(float3 pos) {
 	return color;
 }
 
+__device__ float4 sample_color_texture_interpolated(float3 pos) {
+	float sample = tex3D(volume_texture, (pos.x + 1)*0.5f, (pos.y + 1)*0.5f, (pos.z + 1)*0.5f);
+	float index = sample * (TF_SIZE-1);
+	float floor_index = floor(index);
+	float ceil_index = ceil(index);
+	float4 color = floor_index != ceil_index
+					? transfer_fn[(int) floor_index] * abs(floor_index - index) + transfer_fn[(int) ceil_index] * abs(ceil_index - index)
+					: transfer_fn[(int) index];
+	color.x *= color.w;				// aplikovanie optickeho modelu pre kompoziciu (farba * alfa)			//vyhodit z kernela, prevypocitat
+	color.y *= color.w;
+	color.z *= color.w;
+	return color;
+}
+
 __device__  bool sample_data_esl_texture(float3 pos) {
 		unsigned char sample = tex3D(esl_texture, 
 			map_float_int((pos.x + 1)*0.5f, raycaster.volume.dims.x) / raycaster.esl_block_dims,
 			map_float_int((pos.y + 1)*0.5f, raycaster.volume.dims.y) / raycaster.esl_block_dims,
 			map_float_int((pos.z + 1)*0.5f, raycaster.volume.dims.z) / raycaster.esl_block_dims);
 		return (sample == 0) ? false : true;
+}
+
+__device__ float3 shade_texture(float3 pos, float3 dir, float sample) {
+		float3 light_dir = vector_normalize(raycaster.view.light_pos - pos);
+		sample = tex3D(volume_texture, (pos.x + 1)*0.5f, (pos.y + 1)*0.5f, (pos.z + 1)*0.5f);
+		float sample_l = tex3D(volume_texture, 
+			(pos.x + light_dir.x * 0.01f + 1)*0.5f,
+			(pos.y + light_dir.y * 0.01f + 1)*0.5f,
+			(pos.z + light_dir.z * 0.01f + 1)*0.5f);
+		//float sample_l = sample_color_texture(pos + light_dir * 0.01f).w;
+		float diffuse_light = (sample_l - sample) * raycaster.light_kd;
+		//light_dir = vector_normalize(light_dir + dir);
+		//sample_l = sample_color_texture(pos + light_dir * 0.01f).w;
+		//float specular_light = pow(sample_l - sample + 1, 7) * raycaster.light_ks;
+		return make_float3(diffuse_light, diffuse_light, diffuse_light);
 }
 
 static __global__ void render_ray(uchar4 dev_buffer[]) {
@@ -68,6 +97,7 @@ static __global__ void render_ray(uchar4 dev_buffer[]) {
 		color_acc = color_acc + (make_float4(0.5f, 0.5f, 1, 0.5f) * (1 - color_acc.w));*/
 		for (; k_range.x <= k_range.y; k_range.x += raycaster.ray_step, pt = origin + (direction * k_range.x)) {		
 			float4 color_cur = sample_color_texture(pt);
+			if (color_cur.w > 0.1f) color_cur = color_cur + shade_texture(pt, direction, color_cur.w);
 			color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
 			if (color_acc.w > raycaster.ray_threshold) 
 				break;
@@ -89,7 +119,7 @@ void GPURenderer4::set_transfer_fn(Raycaster r) {
 	}
 	else {
 		cuda_safe_call(cudaMemcpyToArray(transfer_fn_array, 0, 0, r.transfer_fn, TF_SIZE * sizeof(float4), cudaMemcpyHostToDevice));
-		//cuda_safe_call(cudaMemcpyToSymbol(transfer_fn, r.transfer_fn, TF_SIZE * sizeof(float4)));
+		cuda_safe_call(cudaMemcpyToSymbol(transfer_fn, r.transfer_fn, TF_SIZE * sizeof(float4)));
 	}
 	if (esl_array == 0) {
 		cudaExtent volumeDims = {ESL_VOLUME_DIMS, ESL_VOLUME_DIMS, ESL_VOLUME_DIMS};	

@@ -10,7 +10,10 @@ Raycaster RaycasterBase::raycaster = {
 							false,
 							(unsigned char*) malloc(ESL_VOLUME_SIZE * sizeof(unsigned char)),
 							(uchar2*) malloc(ESL_VOLUME_SIZE * 8 * sizeof(uchar2)),
-							ESL_MIN_BLOCK_SIZE
+							ESL_MIN_BLOCK_SIZE,
+							{0, 0, 0},
+							0.6f,
+							0.2f
 						};
 
 void RaycasterBase::change_ray_step(float step, bool reset) {
