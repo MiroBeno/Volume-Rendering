@@ -115,6 +115,7 @@
 				NvccCompilation="0"
 				Arch1="12"
 				Arch2="0"
+				TargetMachinePlatform="0"
 				MaxRegCount="32"
 				PtxAsOptionV="true"
 				Keep="false"

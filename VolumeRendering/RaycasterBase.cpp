@@ -8,12 +8,11 @@ Raycaster RaycasterBase::raycaster = {
 							0.06f,
 							0.95f,
 							false,
-							(unsigned char*) malloc(ESL_VOLUME_SIZE * sizeof(unsigned char)),
-							(uchar2*) malloc(ESL_VOLUME_SIZE * 8 * sizeof(uchar2)),
+							(esl_type*) malloc(ESL_VOLUME_SIZE * sizeof(esl_type)),
+							(uchar2*) malloc(ESL_VOLUME_DIMS * ESL_VOLUME_DIMS * ESL_VOLUME_DIMS * sizeof(uchar2)),
 							ESL_MIN_BLOCK_SIZE,
 							{0, 0, 0},
-							0.6f,
-							0.2f
+							0.6f
 						};
 
 float4 RaycasterBase::base_transfer_fn[TF_SIZE];
@@ -49,18 +48,18 @@ void RaycasterBase::update_transfer_fn() {
 		}
 		esl_temp_tf[x] = y;
 	}
-	/*for(unsigned int i = 0; i < ESL_VOLUME_SIZE * 8; i++) {
+	for(unsigned int i = 0; i < ESL_VOLUME_DIMS * ESL_VOLUME_DIMS * ESL_VOLUME_DIMS; i++) {
 		if (esl_temp_tf[raycaster.esl_min_max[i].x / TF_RATIO] > raycaster.esl_min_max[i].y / TF_RATIO)
-			raycaster.esl_volume[i/8] |= 1 << (i % 8);
+			raycaster.esl_volume[i/32] |= 1 << (i % 32);
 		else 
-			raycaster.esl_volume[i/8]  &= ~(1 << (i % 8));
-	}*/
-	for(unsigned int i = 0; i < ESL_VOLUME_SIZE; i++) {
+			raycaster.esl_volume[i/32]  &= ~(1 << (i % 32));
+	}
+	/*for(unsigned int i = 0; i < ESL_VOLUME_DIMS * ESL_VOLUME_DIMS * ESL_VOLUME_DIMS; i++) {
 		if (esl_temp_tf[raycaster.esl_min_max[i].x / TF_RATIO] > raycaster.esl_min_max[i].y / TF_RATIO)
 			raycaster.esl_volume[i] = 1;
 		else 
 			raycaster.esl_volume[i] = 0;
-	}
+	}*/
 }
 
 void RaycasterBase::set_volume(Model volume) {
@@ -73,7 +72,7 @@ void RaycasterBase::set_volume(Model volume) {
 	raycaster.esl_block_dims = (max_dim + ESL_VOLUME_DIMS - 1) / ESL_VOLUME_DIMS;
 	raycaster.esl_block_dims = MAXIMUM(ESL_MIN_BLOCK_SIZE, raycaster.esl_block_dims);
 
-	for(unsigned int i = 0; i < ESL_VOLUME_SIZE * 8; i++) {
+	for(unsigned int i = 0; i < ESL_VOLUME_DIMS * ESL_VOLUME_DIMS * ESL_VOLUME_DIMS; i++) {
 		raycaster.esl_min_max[i].x = 255;
 		raycaster.esl_min_max[i].y = 0;
 	}

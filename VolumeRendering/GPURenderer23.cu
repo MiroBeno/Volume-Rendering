@@ -5,7 +5,7 @@
 
 static __constant__ Raycaster raycaster;
 static __constant__ float4 transfer_fn[TF_SIZE];
-static __constant__ unsigned char esl_volume[ESL_VOLUME_SIZE];
+static __constant__ esl_type esl_volume[ESL_VOLUME_SIZE];
 
 GPURenderer2::GPURenderer2(Raycaster r) {
 	set_window_buffer(r.view);
@@ -27,29 +27,35 @@ static __global__ void render_ray(uchar4 dev_buffer[]) {
 	float3 origin, direction;
 	float2 k_range;
 	raycaster.view.get_ray(pos, &origin, &direction); 
-	if (raycaster.intersect(origin, direction, &k_range)) {	
-		float3 pt = origin + (direction * k_range.x);
-		for(; k_range.x <= k_range.y; k_range.x += raycaster.ray_step, pt = origin + (direction * k_range.x)) {
-			if (raycaster.esl && raycaster.sample_data_esl(esl_volume, pt)) 
-				raycaster.leap_empty_space(pt, direction, &k_range);
-			else 
-				break;
-		}
-		float4 color_acc = {0, 0, 0, 0};
-		for (; k_range.x <= k_range.y; k_range.x += raycaster.ray_step, pt = origin + (direction * k_range.x)) {		
-			unsigned char sample = raycaster.volume.sample_data(pt);
-			float4 color_cur = transfer_fn[sample / TF_RATIO];
-			color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
-			if (color_acc.w > raycaster.ray_threshold) 
-				break;
-		}
-		raycaster.write_color(color_acc, pos, dev_buffer);
+	if (!raycaster.intersect(origin, direction, &k_range))
+		return;
+	float3 pt = origin + (direction * k_range.x);
+	while(k_range.x <= k_range.y) { 
+		if (raycaster.esl && raycaster.sample_data_esl(esl_volume, pt)) 
+			raycaster.leap_empty_space(pt, direction, &k_range);
+		else 
+			break;
+		k_range.x += raycaster.ray_step;
+		pt = origin + (direction * k_range.x);
 	}
+	if (k_range.x > k_range.y) 
+		return;
+	float4 color_acc = {0, 0, 0, 0};
+	while (k_range.x <= k_range.y) {
+		unsigned char sample = raycaster.volume.sample_data(pt);
+		float4 color_cur = transfer_fn[sample / TF_RATIO];
+		color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
+		if (color_acc.w > raycaster.ray_threshold) 
+			break;
+		k_range.x += raycaster.ray_step;
+		pt = origin + (direction * k_range.x);
+	}
+	raycaster.write_color(color_acc, pos, dev_buffer);
 }
 
 void GPURenderer2::set_transfer_fn(Raycaster r) {
 	cuda_safe_call(cudaMemcpyToSymbol(transfer_fn, r.transfer_fn, TF_SIZE * sizeof(float4)));
-	cuda_safe_call(cudaMemcpyToSymbol(esl_volume, r.esl_volume, ESL_VOLUME_SIZE * sizeof(unsigned char)));
+	cuda_safe_call(cudaMemcpyToSymbol(esl_volume, r.esl_volume, ESL_VOLUME_SIZE * sizeof(esl_type)));
 }
 
 int GPURenderer2::render_volume(uchar4 *buffer, Raycaster r) {

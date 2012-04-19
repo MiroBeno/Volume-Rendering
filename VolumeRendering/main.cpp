@@ -133,9 +133,6 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		case 'l': RaycasterBase::toggle_esl(); break;
 		case '[': RaycasterBase::raycaster.light_kd -= 0.05; printf("kd: %.2f\n", RaycasterBase::raycaster.light_kd); break;
 		case ']': RaycasterBase::raycaster.light_kd += 0.05; printf("kd: %.2f\n", RaycasterBase::raycaster.light_kd); break;
-										
-		case ';':  RaycasterBase::raycaster.light_ks -= 0.05f; printf("ks: %.6f\n", RaycasterBase::raycaster.light_ks); break;
-		case '\'': RaycasterBase::raycaster.light_ks += 0.05f; printf("ks: %.6f\n", RaycasterBase::raycaster.light_ks); break;
 		case '-': ViewBase::toggle_perspective(); break;
 		case '`': renderer_id = 0; break;
 		case '1': renderer_id = 1; break;
@@ -211,7 +208,7 @@ void idle_callback(){
 		if (auto_rotate_vector.y != 0) 
 			ViewBase::camera_down(auto_rotate_vector.y);
 	}
-	ViewBase::light_down(20);
+	//ViewBase::light_down(20);
     draw_volume();
 }
 
@@ -416,9 +413,11 @@ int main(int argc, char **argv) {
 	printf("    'nm' to change ray accumulation threshold\n    'r' to toggle autorotation\n");
 	printf("    '-' to toggle perspective and orthogonal projection\n\n");
 
-        
     int device_count = 0;
-	cuda_safe_call(cudaGetDeviceCount(&device_count));
+	if (cudaGetDeviceCount(&device_count) != cudaSuccess) {
+		printf("Error: Update your display drivers - need at least CUDA driver version 3.2\n");
+	}
+	cuda_safe_check();
 	if (device_count == 0) {
 		printf("Error: No device supporting CUDA found\n");
 		exit(EXIT_FAILURE);
@@ -502,9 +501,10 @@ int main(int argc, char **argv) {
 										i > TF_SIZE/3*2 ? ((i-TF_SIZE/3*2)*3)/(float)(TF_SIZE) : 0.0f, 
 										i > (20/TF_RATIO) ? i/(float)(TF_SIZE) : 0.0f);
 	}
-	/*for (int i =0; i < TF_SIZE; i++) {
+	//RaycasterBase::base_transfer_fn[30] = make_float4(1,1,1,1);
+	for (int i =0; i < TF_SIZE; i++) {
 		RaycasterBase::base_transfer_fn[i] = make_float4(0.23f, 0.23f, 0.0f, i/(float)TF_SIZE);
-	}*/
+	}
 
 	RaycasterBase::raycaster.view = ViewBase::view;
 	RaycasterBase::set_volume(ModelBase::volume);

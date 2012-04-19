@@ -7,10 +7,12 @@
 
 #define ESL_MIN_BLOCK_SIZE 8
 #define ESL_VOLUME_DIMS 32
-#define ESL_VOLUME_SIZE 32*32*32		//32*32*32 bitov 
-//#define ESL_VOLUME_SIZE 4096			//32*32*32 bitov / 8
+//#define ESL_VOLUME_SIZE 32*32*32
+#define ESL_VOLUME_SIZE 1024
 #define TF_SIZE 128
 #define TF_RATIO 2						// 256 / TF_SIZE
+
+typedef unsigned int esl_type;
 
 struct Raycaster {
 	Model volume;
@@ -19,12 +21,11 @@ struct Raycaster {
 	float ray_step;
 	float ray_threshold;
 	bool esl;
-	unsigned char *esl_volume;
+	esl_type *esl_volume;
 	uchar2 *esl_min_max;
 	unsigned short esl_block_dims;
 	float3 esl_block_size;
 	float light_kd;
-	float light_ks;
 
 	__host__ __device__ bool intersect(float3 pt, float3 dir, float2 *k) {  // mozne odchylky pri vypocte => hodnoty k mimo volume; riesi sa clampovanim vysledku na stenu
 		float3 k1 = (volume.min_bound - pt) / dir;			// ak je zlozka vektora rovnobezna s osou a teda so stenou kocky (dir == 0), tak
@@ -60,14 +61,19 @@ struct Raycaster {
 		return color;
 	}
 
-	__forceinline __host__ __device__  bool sample_data_esl(unsigned char esl_volume[], float3 pos) {
-		unsigned int index = ((map_float_int((pos.z + 1)*0.5f, volume.dims.z) / esl_block_dims) * ESL_VOLUME_DIMS * ESL_VOLUME_DIMS +
-			(map_float_int((pos.y + 1)*0.5f, volume.dims.y) / esl_block_dims) * ESL_VOLUME_DIMS +
-			(map_float_int((pos.x + 1)*0.5f, volume.dims.x) / esl_block_dims));
-		//unsigned char sample = esl_volume[index / 8];
-		//return ((sample & (1 << (index % 8))) == 0) ? false : true;
-		unsigned char sample = esl_volume[index];
-		return (sample == 0) ? false : true;
+	__forceinline __host__ __device__  bool sample_data_esl(esl_type esl_volume[], float3 pos) {
+		/*unsigned short index = (	(map_float_int((pos.z + 1)*0.5f, volume.dims.z) / esl_block_dims) * ESL_VOLUME_DIMS * ESL_VOLUME_DIMS +
+									(map_float_int((pos.y + 1)*0.5f, volume.dims.y) / esl_block_dims) * ESL_VOLUME_DIMS +
+									(map_float_int((pos.x + 1)*0.5f, volume.dims.x) / esl_block_dims)
+								);
+		esl_type sample = esl_volume[index];
+		return (sample == 0) ? false : true;*/
+		unsigned short index = ((map_float_int((pos.z + 1)*0.5f, volume.dims.z) / esl_block_dims) * ESL_VOLUME_DIMS +
+								(map_float_int((pos.y + 1)*0.5f, volume.dims.y) / esl_block_dims)
+								);
+		esl_type sample = esl_volume[index];
+		index = map_float_int((pos.x + 1)*0.5f, volume.dims.x) / esl_block_dims;
+		return ((sample & (1 << index)) != 0);
 	}
 
 	__forceinline __host__ __device__ void leap_empty_space(float3 pt, float3 dir, float2 *k) {
@@ -90,13 +96,16 @@ struct Raycaster {
 		k->x += dk;
 	}
 
-	__host__ __device__ float3 shade(float3 pt, float3 dir) {
-		float3 light_dir = vector_normalize(view.light_pos - pt);
-		float sample = volume.sample_data(pt) / 255.0f;
-		float sample_l = volume.sample_data(pt + light_dir * 0.01f) / 255.0f;
-		float diffuse_light = (sample_l - sample);
-		return make_float3(diffuse_light, diffuse_light, diffuse_light) * 0.6f;
-	}
+	__host__ __device__ void shade(float4 *color, float3 pos, unsigned char sample) {
+		if (color->w < 0.1f) 
+			return;
+		float3 light_dir = vector_normalize(view.light_pos - pos);
+		float sample_l = volume.sample_data(pos + light_dir * 0.01f) / 255.0f;
+		float diffuse_light = (sample_l - sample / 255.0f) * light_kd;
+		color->x += diffuse_light;
+		color->y += diffuse_light;
+		color->z += diffuse_light;
+}
 
 };
 
