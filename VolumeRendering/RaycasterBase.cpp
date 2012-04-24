@@ -7,7 +7,7 @@ Raycaster RaycasterBase::raycaster = {
 							(float4 *) malloc(TF_SIZE * sizeof(float4)),
 							0.06f,
 							0.95f,
-							false,
+							true,
 							(esl_type*) malloc(ESL_VOLUME_SIZE * sizeof(esl_type)),
 							(uchar2*) malloc(ESL_VOLUME_DIMS * ESL_VOLUME_DIMS * ESL_VOLUME_DIMS * sizeof(uchar2)),
 							ESL_MIN_BLOCK_SIZE,

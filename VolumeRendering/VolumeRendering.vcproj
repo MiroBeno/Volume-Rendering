@@ -154,7 +154,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="glut32.lib glew32.lib cudart.lib"
+				AdditionalDependencies="glui32.lib glut32.lib glew32.lib cudart.lib"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="$(CUDA_PATH)/lib/$(PlatformName);../libs"
 				GenerateDebugInformation="true"
@@ -227,6 +227,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\UI.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\ViewBase.cpp"
 				>
 			</File>
@@ -258,6 +262,10 @@
 			</File>
 			<File
 				RelativePath=".\Renderer.h"
+				>
+			</File>
+			<File
+				RelativePath=".\UI.h"
 				>
 			</File>
 			<File
