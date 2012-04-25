@@ -16,15 +16,21 @@ Raycaster RaycasterBase::raycaster = {
 						};
 
 float4 RaycasterBase::base_transfer_fn[TF_SIZE];
+float2 RaycasterBase::ray_step_limits;
 
 void RaycasterBase::change_ray_step(float step, bool reset) {
-	raycaster.ray_step = CLAMP(reset ? step : raycaster.ray_step + step, 0.001f, 1);
+	raycaster.ray_step = CLAMP(reset ? step : raycaster.ray_step + step, ray_step_limits.x, ray_step_limits.y);
 	printf("Ray sampling step: %.4f (approx %.1f sampling points)\n", raycaster.ray_step, 2/raycaster.ray_step);
 }
 
 void RaycasterBase::change_ray_threshold(float threshold, bool reset) {
-	raycaster.ray_threshold = CLAMP(reset ? threshold : raycaster.ray_threshold + threshold, 0.25f, 1);
+	raycaster.ray_threshold = CLAMP(reset ? threshold : raycaster.ray_threshold + threshold, 0.5f, 1);
 	printf("Ray accumulation threshold: %.3f\n", raycaster.ray_threshold);
+}
+
+void RaycasterBase::change_light_intensity(float intensity, bool reset) {
+	raycaster.light_kd = CLAMP(reset ? intensity : raycaster.light_kd + intensity, 0, 2);
+	printf("Light intensity: %.3f\n", raycaster.light_kd);
 }
 
 void RaycasterBase::toggle_esl() {
@@ -62,11 +68,30 @@ void RaycasterBase::update_transfer_fn() {
 	}*/
 }
 
+void RaycasterBase::reset_transfer_fn() {
+	for (int i =0; i < TF_SIZE; i++) {
+		RaycasterBase::base_transfer_fn[i] = make_float4(i <= TF_SIZE/3 ? (i*3)/(float)(TF_SIZE) : 0.0f, 
+										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? ((i-TF_SIZE/3)*3)/(float)(TF_SIZE) : 0.0f, 
+										i > TF_SIZE/3*2 ? ((i-TF_SIZE/3*2)*3)/(float)(TF_SIZE) : 0.0f, 
+										i > (20/TF_RATIO) ? i/(float)(TF_SIZE) : 0.0f);
+	}
+	//RaycasterBase::base_transfer_fn[30] = make_float4(1,1,1,1);
+	/*for (int i =0; i < TF_SIZE; i++) {
+		RaycasterBase::base_transfer_fn[i] = make_float4(0.23f, 0.23f, 0.0f, i/(float)TF_SIZE);
+	}*/
+	update_transfer_fn();
+}
+
+void RaycasterBase::reset_ray_step() {
+	int max_dim = MAXIMUM(raycaster.volume.dims.x, MAXIMUM(raycaster.volume.dims.y, raycaster.volume.dims.z));
+	raycaster.ray_step = 2.0f / max_dim;		// dlzka najvacsej hrany je 2 
+	raycaster.ray_step -= raycaster.ray_step / max_dim;
+	ray_step_limits.x = raycaster.ray_step / 3;
+	ray_step_limits.y = raycaster.ray_step * 1.666f;
+}
+
 void RaycasterBase::set_volume(Model volume) {
 	raycaster.volume = volume;
-	int max_size = MAXIMUM(volume.dims.x, MAXIMUM(volume.dims.y, volume.dims.z));
-	raycaster.ray_step = 2.0f / max_size;		// dlzka najvacsej hrany je 2 
-	raycaster.ray_step -= raycaster.ray_step / max_size;
 
 	int max_dim = MAXIMUM(volume.dims.x, MAXIMUM(volume.dims.y, volume.dims.z));
 	raycaster.esl_block_dims = (max_dim + ESL_VOLUME_DIMS - 1) / ESL_VOLUME_DIMS;
@@ -95,5 +120,9 @@ void RaycasterBase::set_volume(Model volume) {
 		2.0f * raycaster.esl_block_dims / volume.dims.z
 	);
 	update_transfer_fn();
+	reset_ray_step();
 }
 
+void RaycasterBase::set_view(View view) {
+	raycaster.view = view;
+}

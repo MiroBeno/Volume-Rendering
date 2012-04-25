@@ -32,7 +32,7 @@ int ModelBase::load_model(const char* file_name) {
     const char *dot = strrchr(file_name, '.');
 	const char supported_ext[2][10] = {".raw", ".pvm"};
 	if (!dot || (strcmp(dot, supported_ext[0]) != 0 && strcmp(dot, supported_ext[1]) != 0)) {
-		printf("File error: Unsupported file extension (.raw|.pvm allowed)\n");
+		fprintf(stderr, "File error: Unsupported file extension (.raw|.pvm allowed)\n");
 		return 1;
 	}
 	unsigned char *loaded_data;
@@ -77,14 +77,14 @@ int ModelBase::load_model(const char* file_name) {
 			printf("Enter RAW file volume components (bytes per voxel): ");   
 			scanf("%d", &components);
 			if (width * height * depth * components != size) {
-				printf("Error: Incorrect RAW file volume parameters\n");
+				fprintf(stderr, "Error: Incorrect RAW file volume parameters\n");
 				free(loaded_data);
 				return 1;
 			}
 		}
 	}
 	if (components > 2) {
-		printf("Error: Unsupported number of components (1|2 allowed)\n");
+		fprintf(stderr, "Error: Unsupported number of components (1|2 allowed)\n");
 		free(loaded_data);
 		return 1;
 	}
@@ -95,7 +95,7 @@ int ModelBase::load_model(const char* file_name) {
 	volume.dims = make_ushort3(width, height, depth);
 	volume.size = size;
 	volume.data = loaded_data;
-	printf("File successfully loaded: %s, volume size: %.2f MB\n\n", file_name, volume.size / (float)(1024 * 1024));
+	printf("File loaded: %s, volume size: %.2f MB\n\n", file_name, volume.size / (float)(1024 * 1024));
 	compute_histogram();
 
 	return 0;

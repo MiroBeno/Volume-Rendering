@@ -112,11 +112,16 @@ class RaycasterBase {
 	public:
 		static Raycaster raycaster;
 		static float4 base_transfer_fn[TF_SIZE];
+		static float2 ray_step_limits;
 		static void change_ray_step(float step, bool reset);
 		static void change_ray_threshold(float threshold, bool reset);
+		static void change_light_intensity(float intensity, bool reset);
 		static void toggle_esl();
 		static void set_volume(Model volume);
+		static void set_view(View view);
 		static void update_transfer_fn();
+		static void reset_transfer_fn();
+		static void reset_ray_step();
 };
 
 #endif

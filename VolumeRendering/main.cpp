@@ -2,18 +2,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-/**/#include <ctime>
-
 #include "Model.h"
 #include "View.h"
 #include "Raycaster.h"
 #include "Renderer.h"
 #include "UI.h"
+#include "Profiler.h"
+#include "constants.h"
 
 #include "cuda_utils.h"
 #include "cuda_gl_interop.h"
 
-extern const int RENDERERS_COUNT = 5;
 //const char *FILE_NAME = "Bucky.pvm";						// 32x32x32 x 8bit
 //const char *FILE_NAME = "Foot.pvm";						// 256x256x256 x 8bit
 const char *FILE_NAME = "VisMale.pvm";					// 128x256x256 x 8bit
@@ -25,12 +24,10 @@ static GLuint tex_gl_id = NULL;
 static int gpu_id;
 static cudaGraphicsResource *pbo_cuda_id;
 
-static cudaEvent_t start, stop, frame; 
-/**/static clock_t start_time;
-float2 elapsed_time = {0, 0};
+//static cudaEvent_t frame; 
 
-int renderer_id = 1;
-Renderer *renderers[RENDERERS_COUNT];
+static int renderer_id = 1;
+static Renderer *renderers[RENDERER_COUNT];
 
 void delete_PBO_texture() {
     if (pbo_gl_id != NULL) {
@@ -87,54 +84,47 @@ void draw_volume() {
 			return;
 		reset_PBO_texture();
 		ViewBase::set_window_size(UI::window_size);
-		for (int i=0; i < RENDERERS_COUNT; i++)
+		for (int i=0; i < RENDERER_COUNT; i++)
 			renderers[i]->set_window_buffer(ViewBase::view);
 		UI::window_resize_flag = false;
 	}
-	RaycasterBase::raycaster.view = ViewBase::view;
+	RaycasterBase::set_view(ViewBase::view);
 	uchar4 *pbo_array = prepare_PBO();
-	cuda_safe_call(cudaEventRecord(start, 0));
-	if (renderer_id == 0) 
-		start_time = clock();
+
+	Profiler::start(renderer_id, 0, renderer_id == 0 ? 0 : 1);
 	renderers[renderer_id]->render_volume(pbo_array, RaycasterBase::raycaster);
-	cuda_safe_call(cudaEventRecord(stop, 0));
-	cuda_safe_call(cudaEventSynchronize(stop));
-	cuda_safe_call(cudaEventElapsedTime(&elapsed_time.x, start, stop));
-	cuda_safe_call(cudaEventElapsedTime(&elapsed_time.y, frame, stop));
-	if (renderer_id == 0) {
-		elapsed_time.x = (clock() - start_time) / (CLOCKS_PER_SEC / 1000.0f);
-		elapsed_time.y = 0;
-	}
+	Profiler::stop();
+
+	//cuda_safe_call(cudaEventElapsedTime(&elapsed_time.y, frame, stop));
 	finalize_PBO();
-	cuda_safe_call(cudaEventRecord(frame, 0));
+	//cuda_safe_call(cudaEventRecord(frame, 0));
 }
 
 void cleanup_and_exit() {
 	printf("Cleaning...\n");
-	cuda_safe_call(cudaEventDestroy(start));
-	cuda_safe_call(cudaEventDestroy(stop));
-	cuda_safe_call(cudaEventDestroy(frame));
+	//cuda_safe_call(cudaEventDestroy(frame));
 	delete_PBO_texture();
-	for (int i = RENDERERS_COUNT - 1; i >=0 ; i--)
+	Profiler::destroy();
+	for (int i = RENDERER_COUNT - 1; i >=0 ; i--)
 		delete renderers[i];
 	free(ModelBase::volume.data);
 	free(RaycasterBase::raycaster.transfer_fn);
 	free(RaycasterBase::raycaster.esl_min_max);
 	free(RaycasterBase::raycaster.esl_volume);
-	UI::cleanup();
+	UI::destroy();
 	printf("Bye!\n");
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
 void init_cuda() {
 	printf("Initializing CUDA...\n");
     int device_count = 0;
 	if (cudaGetDeviceCount(&device_count) != cudaSuccess) {
-		printf("Error: Update your display drivers - need at least CUDA driver version 3.2\n");
+		fprintf(stderr, "Error: Update your display drivers - need at least CUDA driver version 3.2\n");
 	}
 	cuda_safe_check();
 	if (device_count == 0) {
-		printf("Error: No device supporting CUDA found\n");
+		fprintf(stderr, "Error: No device supporting CUDA found\n");
 		exit(EXIT_FAILURE);
 	}
 	printf("Number of CUDA devices found: %d\n", device_count);
@@ -185,7 +175,7 @@ void init_cuda() {
 			device_prop.multiProcessorCount,
 			max_perf_device_cpm,
 			max_perf_device_cpm * device_prop.multiProcessorCount);
-	printf("  Total amount of global memory:            %llu bytes\n", (unsigned long long) device_prop.totalGlobalMem);
+	printf("  Total amount of global memory:            %lu MB\n", (unsigned long) device_prop.totalGlobalMem / (1024*1024));
 	printf("  Total amount of constant memory:          %u bytes\n", device_prop.totalConstMem); 
 	printf("  Total amount of shared memory per block:  %u bytes\n", device_prop.sharedMemPerBlock);
 	printf("  Total number of registers per block:	    %d\n", device_prop.regsPerBlock);
@@ -194,14 +184,26 @@ void init_cuda() {
 	printf("\n");
 
 	cuda_safe_call(cudaGLSetGLDevice(gpu_id));
-	cuda_safe_call(cudaEventCreate(&start));
-	cuda_safe_call(cudaEventCreate(&stop));
-	cuda_safe_call(cudaEventCreate(&frame));
-	cuda_safe_call(cudaEventRecord(frame, 0));
+
+//	cuda_safe_call(cudaEventCreate(&frame));
+//	cuda_safe_call(cudaEventRecord(frame, 0));
+}
+
+void benchmark() {
+	printf("Entering benchmark loop...\n");
+	int sample_count[RENDERER_COUNT] = {0, 10, 10, 10, 10};
+	for(renderer_id = 0; renderer_id < RENDERER_COUNT; renderer_id++) {
+		// for configuration
+		for (int k = 0; k < sample_count[renderer_id]; k++) {
+			draw_volume();
+		}
+	}
+	Profiler::dump("profiler.txt");
 }
 
 int main(int argc, char **argv) {
 
+	bool benchmark_mode = false;
 	for (int i = 1; i < argc; i++) {
 		char *arg = argv[i];
 		if (strncmp(arg, "-h", 2) == 0) {
@@ -221,6 +223,8 @@ int main(int argc, char **argv) {
 			UI::window_size.x = (unsigned short) width;
 			UI::window_size.y = (unsigned short) height;
 			ViewBase::set_window_size(UI::window_size);
+		} else if (strncmp(arg, "-b", 2) == 0) {
+			benchmark_mode = true;
 		} else {
 			printf("Warning: unknown argument: %s\n", arg);
 		}
@@ -230,41 +234,32 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	for (int i =0; i < TF_SIZE; i++) {
-		RaycasterBase::base_transfer_fn[i] = make_float4(i <= TF_SIZE/3 ? (i*3)/(float)(TF_SIZE) : 0.0f, 
-										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? ((i-TF_SIZE/3)*3)/(float)(TF_SIZE) : 0.0f, 
-										i > TF_SIZE/3*2 ? ((i-TF_SIZE/3*2)*3)/(float)(TF_SIZE) : 0.0f, 
-										i > (20/TF_RATIO) ? i/(float)(TF_SIZE) : 0.0f);
-	}
-	//RaycasterBase::base_transfer_fn[30] = make_float4(1,1,1,1);
-	/*for (int i =0; i < TF_SIZE; i++) {
-		RaycasterBase::base_transfer_fn[i] = make_float4(0.23f, 0.23f, 0.0f, i/(float)TF_SIZE);
-	}*/
-	RaycasterBase::raycaster.view = ViewBase::view;
+	RaycasterBase::set_view(ViewBase::view);
+	RaycasterBase::reset_transfer_fn();
 	RaycasterBase::set_volume(ModelBase::volume);
 
-	UI::init_gl(argc, argv);
+	UI::init(renderers, &renderer_id, draw_volume, cleanup_and_exit);
 	init_cuda();
 	reset_PBO_texture();
 
-	printf("Initializing renderers 0 - %d...\n", RENDERERS_COUNT);
+	Profiler::init();
+
+	printf("Initializing renderers 0 - %d...\n", RENDERER_COUNT - 1);
 	renderers[0] = new CPURenderer(RaycasterBase::raycaster);	
 	renderers[1] = new GPURenderer1(RaycasterBase::raycaster);
 	renderers[2] = new GPURenderer2(RaycasterBase::raycaster);
 	renderers[3] = new GPURenderer3(RaycasterBase::raycaster);
 	renderers[4] = new GPURenderer4(RaycasterBase::raycaster);
 	
-	printf("Initialization successful - entering main event loop...\n");
+	if (benchmark_mode) {
+		benchmark();
+		cleanup_and_exit();
+	}
+
+	printf("Entering main event loop...\n");
 	//printf("Raycaster data size: %i B\n", sizeof(Raycaster));
 
-	printf("\nUse '`1234' to change renderer\n    'wasd' and '7890' to manipulate camera position\n");
-	printf("    'op' to change ray sampling rate\n");
-	printf("    'nm' to change ray accumulation threshold\n    'r' to toggle autorotation\n");
-	printf("    'l' to toggle empty space leaping\n");
-	printf("    '[]' to change volume illumination intensity\n");
-	printf("    '-' to toggle perspective and orthogonal projection\n");
-	printf("    't' to toggle transfer function editor\n\n");
-
+	UI::print_usage();
 	UI::start();
 	return EXIT_FAILURE;
 }

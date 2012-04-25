@@ -15,7 +15,7 @@
 
 static void __cuda_safe_call(cudaError_t err, const char *file, int line) {
     if (err != cudaSuccess) {
-		printf("CUDA fatal error: %s in %s at line %d\n", cudaGetErrorString(err), file, line);
+		fprintf(stderr, "CUDA fatal error: %s in %s at line %d\n", cudaGetErrorString(err), file, line);
         exit(EXIT_FAILURE);
     }
 }
