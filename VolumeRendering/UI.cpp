@@ -3,14 +3,23 @@
 char UI::app_name[256] = "VR:";
 ushort2 UI::window_size = {INT_WIN_WIDTH, INT_WIN_HEIGHT};
 bool UI::window_resize_flag = false;
-int UI::main_window_id, UI::tf_editor_id;
-GLUI *UI::glui_panel;
-bool UI::tf_editor_visible = true;
 
 static Renderer **renderers;
 static int *renderer_id;
 static void (*draw_function)();
 static void (*exit_function)();
+
+
+
+static GLUI *glui_panel;
+static GLUI_Checkbox *ert_checkbox, *light_enabled_checkbox;
+static GLUI_Spinner *ert_spinner;
+static GLUI_Scrollbar *light_intensity_scroll;
+static GLUI_StaticText *light_text;
+static GLUI_Rotation *light_rotation;
+
+static int main_window_id, tf_editor_id;
+static int fullscreen = false, tf_editor_visible = true, glui_panel_visible = true;
 static short4 mouse_state = {0, 0, GLUT_LEFT_BUTTON, GLUT_UP};
 static short2 auto_rotate = {0, 0};
 static char title_string[256];
@@ -22,22 +31,57 @@ static char renderer_names[RENDERER_COUNT][256] = {"CPU", "CUDA Straightforward"
 // Callbacks helper functions
 /****************************************/
 
-void toggle_auto_rotate(int value) {
-	if (auto_rotate.x == 0 && auto_rotate.y == 0) {
-		auto_rotate = make_short2(-5, -5);
-		printf("Autorotation: on\n");
-	}
-	else {
-		auto_rotate = make_short2(0, 0);
-		printf("Autorotation: off\n");
-	}
-}
-
-void set_renderer(int id) {
+void set_renderer_callback(int id) {
 	if ((id < 0) || (id >= RENDERER_COUNT))
 		return;
 	*renderer_id = id;
 	printf("Setting renderer: %s\n", renderer_names[id]);
+}
+
+void exit_callback(int value) {
+	exit_function();
+}
+
+void sync_glui() {
+	if (RaycasterBase::raycaster.ray_threshold != 1.0f) {
+		ert_checkbox->set_int_val(1);
+		ert_spinner->enable();
+	}
+	if (RaycasterBase::raycaster.light_kd != 0.0f) {
+		light_enabled_checkbox->set_int_val(1);
+		light_intensity_scroll->enable();
+		light_text->enable();
+		light_rotation->enable();
+	}
+	glui_panel->sync_live();
+}
+
+void glui_callback(GLUI_Control *source) {
+	if (source == ert_checkbox) {
+		if (ert_checkbox->get_int_val()) {
+			RaycasterBase::change_ray_threshold(0.95f, true);
+			ert_spinner->enable();
+		}
+		else {
+			RaycasterBase::change_ray_threshold(1, true);
+			ert_spinner->disable();
+		}
+	}
+	else if (source == light_enabled_checkbox) {
+		if (light_enabled_checkbox->get_int_val()) {
+			RaycasterBase::change_light_intensity(0.6f, true);
+			light_intensity_scroll->enable();
+			light_text->enable();
+			light_rotation->enable();
+		}
+		else {
+			RaycasterBase::change_light_intensity(0.0f, true);
+			light_intensity_scroll->disable();
+			light_text->disable();
+			light_rotation->disable();
+		}
+	}
+	glui_panel->sync_live();
 }
 
 /****************************************/
@@ -46,7 +90,6 @@ void set_renderer(int id) {
 
 void display_callback(void) {
 	//printf("Main window display callback...\n");
-	//draw_volume();
 	draw_function();
 	sprintf(title_string, "%s %s @ %.2f ms / %.2f ms (%dx%d)", UI::app_name, renderer_names[*renderer_id], 
 		Profiler::time_ms, 0.0f, UI::window_size.x, UI::window_size.y);
@@ -73,7 +116,7 @@ void idle_callback(void) {
 		if (auto_rotate.y != 0) 
 			ViewBase::camera_down(auto_rotate.y);
 	}
-	glutSetWindow(UI::main_window_id);
+	glutSetWindow(main_window_id);
     glutPostRedisplay();
 }
 
@@ -92,24 +135,26 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		case 'l': RaycasterBase::toggle_esl(); break;
 		case '[': RaycasterBase::change_light_intensity(-0.05f, false); break;
 		case ']': RaycasterBase::change_light_intensity(0.05f, false); break;
-		case '-': ViewBase::toggle_perspective(); break;
-		case '`': set_renderer(0); break;
-		case '1': set_renderer(1); break;
-		case '2': set_renderer(2); break;
-		case '3': set_renderer(3); break;
-		case '4': set_renderer(4); break;
+		case '-': ViewBase::toggle_perspective(false); break;
+		case '`': set_renderer_callback(0); break;
+		case '1': set_renderer_callback(1); break;
+		case '2': set_renderer_callback(2); break;
+		case '3': set_renderer_callback(3); break;
+		case '4': set_renderer_callback(4); break;
 		case '7': ViewBase::set_camera_position(3,-45,-45); break;
 		case '8': ViewBase::set_camera_position(3,0,0); break;
 		case '9': ViewBase::set_camera_position(3,-90,0); break;
 		case '0': ViewBase::set_camera_position(3,180,-90); break;
-		case 'r': toggle_auto_rotate(0); break;
-		case 't': UI::toggle_tf_editor(); break;
+		case 'r': UI::toggle_auto_rotate(false); break;
+		case 'c': UI::toggle_glui_panel(false); break;
+		case 't': UI::toggle_tf_editor(false); break;
+		case 'f': UI::toggle_fullscreen(false); break;
 		case 'v': idle_callback(); break;
 	}
 	if (key==27) {
-		exit_function();
+		exit_callback(0);
 	}
-	UI::glui_panel->sync_live();
+	sync_glui();
 }
 
 void mouse_callback(int button, int state, int x, int y) {
@@ -148,9 +193,10 @@ void motion_callback(int x, int y) {
 
 void reshape_callback(int w, int h) {				
 	//printf("Resizing main window... %i %i\n", w, h);
-	int width, height, left, top;
-	GLUI_Master.get_viewport_area(&left, &top, &width, &height);
-	UI::set_viewport_size(width, height);
+	int left, top;
+	if (glui_panel_visible) 
+		GLUI_Master.get_viewport_area(&left, &top, &w, &h);
+	UI::set_viewport_size(w, h);
 }
 
 /****************************************/
@@ -233,10 +279,36 @@ void UI::set_viewport_size(int width, int height) {
 	}
 }
 
-void UI::toggle_tf_editor() {
+void UI::toggle_fullscreen(int update_mode) {
+	if (!update_mode)
+		fullscreen = !fullscreen;
+	glutSetWindow(main_window_id);
+	if (fullscreen) 
+		glutFullScreen();
+	else 
+		glutReshapeWindow(512, 512);
+}
+
+void UI::toggle_tf_editor(int update_mode) {
+	if (!update_mode)
+		tf_editor_visible = !tf_editor_visible;
 	glutSetWindow(tf_editor_id);
-	tf_editor_visible ? glutHideWindow() : glutShowWindow();
-	tf_editor_visible = !tf_editor_visible;
+	tf_editor_visible ? glutShowWindow() : glutHideWindow();
+}
+
+void UI::toggle_glui_panel(int update_mode) {
+	if (!update_mode)
+		glui_panel_visible = !glui_panel_visible;
+	glui_panel_visible ? glui_panel->show() : glui_panel->hide();
+	glutSetWindow(main_window_id);
+	reshape_callback(glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
+}
+
+void UI::toggle_auto_rotate(int update_mode) {
+	if (auto_rotate.x == 0 && auto_rotate.y == 0) 
+		auto_rotate = make_short2(-5, -5);
+	else 
+		auto_rotate = make_short2(0, 0);
 }
 
 void UI::destroy() {
@@ -246,15 +318,16 @@ void UI::destroy() {
 void UI::init_glui() {
 	printf("Initializing GLUI version %.2f...\n", GLUI_Master.get_version());
 	glui_panel = GLUI_Master.create_glui_subwindow(main_window_id, GLUI_SUBWINDOW_RIGHT);
-	//glui_subwindow->set_main_gfx_window(window_id);
+	glui_panel->set_main_gfx_window(main_window_id);
+
 	GLUI_Rollout *renderers_panel = new GLUI_Rollout(glui_panel, "Renderers", true);
 	new GLUI_StaticText(renderers_panel, "CPU:");
-	new GLUI_Button(renderers_panel, "CPU", 0, set_renderer);
+	new GLUI_Button(renderers_panel, "CPU", 0, set_renderer_callback);
 	new GLUI_StaticText(renderers_panel, "GPU:");
-	new GLUI_Button(renderers_panel, "CUDA", 1, set_renderer);
-	new GLUI_Button(renderers_panel, "CUDA CMem", 2, set_renderer);
-	new GLUI_Button(renderers_panel, "CUDA GL Interop", 3, set_renderer);
-	new GLUI_Button(renderers_panel, "CUDA TexMem", 4, set_renderer);
+	new GLUI_Button(renderers_panel, "CUDA", 1, set_renderer_callback);
+	new GLUI_Button(renderers_panel, "CUDA CMem", 2, set_renderer_callback);
+	new GLUI_Button(renderers_panel, "CUDA GL Interop", 3, set_renderer_callback);
+	new GLUI_Button(renderers_panel, "CUDA TexMem", 4, set_renderer_callback);
 
 	GLUI_Rollout *view_panel = new GLUI_Rollout(glui_panel, "View", true);
 	GLUI_Panel *camera_panel = new GLUI_Panel(view_panel, "", false);
@@ -269,43 +342,44 @@ void UI::init_glui() {
 	GLUI_Translation *translation = 
 		new GLUI_Translation(camera_panel, "Translation", GLUI_TRANSLATION_Z, NULL);
 	translation->set_speed(0.005f);
-	GLUI_RadioGroup *projection = new GLUI_RadioGroup(view_panel);
+	GLUI_RadioGroup *projection = new GLUI_RadioGroup(view_panel, (int *) &ViewBase::view.perspective, true, ViewBase::toggle_perspective);
 	projection->set_alignment(GLUI_ALIGN_CENTER);
 	new GLUI_RadioButton(projection, "Orthogonal");
 	new GLUI_RadioButton(projection, "Perspective");
 
 	GLUI_Rollout *optimizations_panel = new GLUI_Rollout(glui_panel, "Optimizations", true);
 	new GLUI_Checkbox(optimizations_panel, "Empty space leaping", (int *) &RaycasterBase::raycaster.esl);
-	new GLUI_Checkbox(optimizations_panel, "Early ray termination:");
-	GLUI_Spinner *ert = new GLUI_Spinner(optimizations_panel, "  Threshold", &RaycasterBase::raycaster.ray_threshold);
-	ert->set_float_limits(0.5f, 1.0f);
-	ert->set_speed(10.0f);
-	new GLUI_Checkbox(optimizations_panel, "Ray sampling rate:");
+	ert_checkbox = new GLUI_Checkbox(optimizations_panel, "Early ray termination:", 0, 0, glui_callback);
+	ert_checkbox->set_int_val(1);
+	ert_spinner = new GLUI_Spinner(optimizations_panel, "  Threshold", &RaycasterBase::raycaster.ray_threshold);
+	ert_spinner->set_float_limits(0.5f, 1.0f);
+	ert_spinner->set_speed(10.0f);
+	new GLUI_StaticText(optimizations_panel, "Ray sampling rate:");
 	GLUI_Scrollbar *step = new GLUI_Scrollbar(optimizations_panel, "Rate", GLUI_SCROLL_HORIZONTAL, &RaycasterBase::raycaster.ray_step);
 	step->set_float_limits(RaycasterBase::ray_step_limits.x, RaycasterBase::ray_step_limits.y);
-	new GLUI_Checkbox(optimizations_panel, "Image downscaling:");
+	new GLUI_StaticText(optimizations_panel, "Image downscaling:");
 	new GLUI_StaticText(optimizations_panel, "  Resolution: x ");
 	GLUI_Scrollbar *scale = new GLUI_Scrollbar(optimizations_panel, "Scale", GLUI_SCROLL_HORIZONTAL);
 	scale->set_float_limits(0.25f, 1.0f);
 
 	GLUI_Rollout *lighting_panel = new GLUI_Rollout(glui_panel, "Lighting", true);
-	new GLUI_Checkbox(lighting_panel, "Enabled");
-	GLUI_Rotation *light_rotation = 
-		new GLUI_Rotation(lighting_panel, "Light position", light_rotate);
+	light_enabled_checkbox = new GLUI_Checkbox(lighting_panel, "Enabled", 0, 0, glui_callback);
+	light_enabled_checkbox->set_int_val(1);
+	light_rotation = new GLUI_Rotation(lighting_panel, "Light position", light_rotate);
 	light_rotation->set_spin(1.0);
-	new GLUI_StaticText(lighting_panel, "Intensity:");
-	GLUI_Scrollbar *intensity = new GLUI_Scrollbar(lighting_panel, "Intensity", GLUI_SCROLL_HORIZONTAL, &RaycasterBase::raycaster.light_kd);
-	intensity->set_float_limits(0.0f, 2.0f);
+	light_text = new GLUI_StaticText(lighting_panel, "Intensity:");
+	light_intensity_scroll = new GLUI_Scrollbar(lighting_panel, "Intensity", GLUI_SCROLL_HORIZONTAL, &RaycasterBase::raycaster.light_kd);
+	light_intensity_scroll->set_float_limits(0.0f, 2.0f);
 
 	GLUI_Rollout *controls_panel = new GLUI_Rollout(glui_panel, "Controls", true);
-	new GLUI_Checkbox(controls_panel, "Fullscreen");
-	new GLUI_Checkbox(controls_panel, "Control panel");
+	new GLUI_Checkbox(controls_panel, "Fullscreen", &fullscreen, true, UI::toggle_fullscreen);
+	new GLUI_Checkbox(controls_panel, "Control panel", &glui_panel_visible, true, UI::toggle_glui_panel);
 	new GLUI_Checkbox(controls_panel, "Render time stats");
-	new GLUI_Checkbox(controls_panel, "Transfer function editor");
+	new GLUI_Checkbox(controls_panel, "Transfer function editor", &tf_editor_visible, true, UI::toggle_tf_editor);
 	/*new GLUI_Checkbox(controls_panel, "Data histogram");
 	new GLUI_Checkbox(controls_panel, "High precision (^4)");
 	new GLUI_Button(controls_panel, "Reset");*/
-	GLUI_Button *quit_button = new GLUI_Button(glui_panel, "Quit");
+	GLUI_Button *quit_button = new GLUI_Button(glui_panel, "Quit", 0, exit_callback);
 	quit_button->set_w(150);
 	GLUI_FileBrowser *fb = new GLUI_FileBrowser(glui_panel, "Load File");
 	new GLUI_StaticText(fb, "Current file: filename");
@@ -329,7 +403,7 @@ void UI::init(Renderer **rends, int *rend_id, void (*draw_fn)(), void (*exit_fn)
 
 	main_window_id = glutCreateWindow(app_name);
 	glutMotionFunc(motion_callback);
-	GLUI_Master.set_glutDisplayFunc(display_callback);
+	glutDisplayFunc(display_callback);
 	GLUI_Master.set_glutIdleFunc(idle_callback);
 	GLUI_Master.set_glutKeyboardFunc(keyboard_callback);
 	GLUI_Master.set_glutMouseFunc(mouse_callback);
@@ -360,7 +434,6 @@ void UI::init(Renderer **rends, int *rend_id, void (*draw_fn)(), void (*exit_fn)
 
 	init_glui();
 	glutSetWindow(main_window_id);
-	//glutFullScreen();
 
 	printf("Initializing GLEW version %s...\n", glewGetString(GLEW_VERSION));
 	GLenum err = glewInit();

@@ -14,11 +14,10 @@ class UI {
 		static char app_name[];
 		static ushort2 window_size;
 		static bool window_resize_flag;
-		static int main_window_id, tf_editor_id;
-		static GLUI *glui_panel;
-		static bool	tf_editor_visible;
-		static bool auto_rotation;
-		static void toggle_tf_editor();
+		static void toggle_fullscreen(int update_mode);
+		static void toggle_tf_editor(int update_mode);
+		static void toggle_glui_panel(int update_mode);
+		static void toggle_auto_rotate(int update_mode);
 		static void set_viewport_size(int width, int height);
 		static void destroy();
 		static void init(Renderer *rends[], int *rend_id, void (*draw_fn)(), void (*exit_fn)());

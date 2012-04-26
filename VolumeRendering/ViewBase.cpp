@@ -96,8 +96,9 @@ void ViewBase::light_right(int pixels) {
 	view.light_pos = angles_to_point(&light_position);
 }
 
-void ViewBase::toggle_perspective() {
-	view.perspective = !view.perspective;
+void ViewBase::toggle_perspective(int update_mode) {
+	if (!update_mode)
+		view.perspective = !view.perspective;
 	virtual_view_size = view.perspective ? 1.5f : 3.0f;
 	printf("Perspective rays: %s\n", view.perspective ? "on" : "off");
 	update_view();

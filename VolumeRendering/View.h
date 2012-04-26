@@ -41,7 +41,7 @@ class ViewBase {
 		static void light_down(int pixels);
 		static void light_right(int pixels);
 		static void set_camera_position(float distance, float vert_angle, float horiz_angle);
-		static void toggle_perspective();
+		static void toggle_perspective(int update_mode);
 		static void set_window_size(ushort2 px);
 	private:
 		static const float2 distance_limits;
