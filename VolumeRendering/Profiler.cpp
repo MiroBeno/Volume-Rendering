@@ -60,7 +60,7 @@ float Profiler::stop() {
 		counters[current_renderer][current_configuration]++;
 	}
 	// reset profiler control data
-	current_renderer = current_configuration = current_method = -1;
+	//current_renderer = current_configuration = current_method = -1;
 	return time_ms;
 }
 

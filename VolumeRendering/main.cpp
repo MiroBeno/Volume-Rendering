@@ -41,7 +41,7 @@ void delete_PBO_texture() {
 	}
 }
 
-void reset_PBO_texture() {							// ! musi byt setnute main glut window, inak padne
+void reset_PBO_texture() {							// ! musi byt setnute main glut window, inak padne		// bug pri nastavenom downsampling a rozmere 0 pri cuda r
 	printf("Setting pixel buffer object...\n");
 	delete_PBO_texture();
 	glGenBuffersARB(1, &pbo_gl_id);	

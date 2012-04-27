@@ -19,10 +19,9 @@ static int fullscreen = false, tf_editor_visible = true, glui_panel_visible = tr
 static float viewport_scale = 1.0f;
 static short4 mouse_state = {0, 0, GLUT_LEFT_BUTTON, GLUT_UP};
 static short2 auto_rotate = {0, 0};
-static char title_string[256];
 static char renderer_names[RENDERER_COUNT][256] = {"CPU", "CUDA Straightforward", "CUDA Constant Memory", "CUDA CM + GL interop", "CUDA CM + 3D Texture Memory + GLI"};
 /**/static float view_rotate[16] = { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 };
-/**/static float light_rotate[16] = { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 };
+static char text_buffer[200];
 
 /****************************************/
 // Callbacks helper functions
@@ -40,56 +39,15 @@ void exit_callback(int value) {
 }
 
 void sync_glui() {
-	if (RaycasterBase::raycaster.ray_threshold != 1.0f) {
+	if (RaycasterBase::raycaster.ray_threshold < 1.0f) {
 		ert_checkbox->set_int_val(1);
 		ert_spinner->enable();
 	}
-	if (RaycasterBase::raycaster.light_kd != 0.0f) {
+	if (RaycasterBase::raycaster.light_kd > 0.0f) {
 		light_enabled_checkbox->set_int_val(1);
 		light_intensity_scroll->enable();
 		light_text->enable();
 		light_rotation->enable();
-	}
-	glui_panel->sync_live();
-}
-
-void glui_callback(GLUI_Control *source) {
-	if (source == ert_checkbox) {
-		if (ert_checkbox->get_int_val()) {
-			RaycasterBase::change_ray_threshold(0.95f, true);
-			ert_spinner->enable();
-		}
-		else {
-			RaycasterBase::change_ray_threshold(1, true);
-			ert_spinner->disable();
-		}
-	}
-	else if (source == light_enabled_checkbox) {
-		if (light_enabled_checkbox->get_int_val()) {
-			RaycasterBase::change_light_intensity(0.6f, true);
-			light_intensity_scroll->enable();
-			light_text->enable();
-			light_rotation->enable();
-		}
-		else {
-			RaycasterBase::change_light_intensity(0.0f, true);
-			light_intensity_scroll->disable();
-			light_text->disable();
-			light_rotation->disable();
-		}
-	}
-	else if (source == scale_scroll) {
-		glutSetWindow(main_window_id);
-		int left, top, w = glutGet(GLUT_WINDOW_WIDTH), h = glutGet(GLUT_WINDOW_HEIGHT);
-		if (glui_panel_visible) 
-			GLUI_Master.get_viewport_area(&left, &top, &w, &h);
-		w = (int) (w * viewport_scale);
-		h = (int) (h * viewport_scale);
-		ViewBase::set_viewport_dims(make_ushort2(w, h));
-		UI::viewport_resized_flag = true;
-		char text[100];
-		sprintf(text, "  Resolution: %dx%d", w, h);
-		resolution_text->set_text(text);
 	}
 	glui_panel->sync_live();
 }
@@ -100,10 +58,11 @@ void glui_callback(GLUI_Control *source) {
 
 void display_callback(void) {
 	//printf("Main window display callback...\n");
+	/**/float frame = Profiler::stop();
 	UI::draw_function();
-	sprintf(title_string, "%s %s @ %.2f ms / %.2f ms (%dx%d)", UI::app_name, renderer_names[*UI::renderer_id], 
-		Profiler::time_ms, 0.0f, ViewBase::view.dims.x, ViewBase::view.dims.y);
-	glutSetWindowTitle(title_string);
+	sprintf(text_buffer, "%s %s @ %.2f ms / %.2f ms (%dx%d)", UI::app_name, renderer_names[*UI::renderer_id], 
+		Profiler::time_ms, frame, ViewBase::view.dims.x, ViewBase::view.dims.y);
+	glutSetWindowTitle(text_buffer);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -219,6 +178,8 @@ void reshape_callback(int w, int h) {
 		ViewBase::set_viewport_dims(make_ushort2(w, h));
 		UI::viewport_resized_flag = true;
 	}
+	sprintf(text_buffer, "  Resolution: %dx%d", w, h);
+	resolution_text->set_text(text_buffer);
 }
 
 /****************************************/
@@ -280,6 +241,49 @@ void mouse_tfe_callback(int button, int state, int x, int y) {
 	mouse_state.y = y;
 	mouse_state.z = button;
 	motion_tfe_callback(x, y);
+}
+
+/****************************************/
+// GLUI callback
+/****************************************/
+
+void glui_callback(GLUI_Control *source) {
+	if (source == ert_checkbox) {
+		if (ert_checkbox->get_int_val()) {
+			RaycasterBase::change_ray_threshold(0.95f, true);
+			ert_spinner->enable();
+		}
+		else {
+			RaycasterBase::change_ray_threshold(1, true);
+			ert_spinner->disable();
+		}
+	}
+	else if (source == light_enabled_checkbox) {
+		if (light_enabled_checkbox->get_int_val()) {
+			RaycasterBase::change_light_intensity(0.6f, true);
+			light_intensity_scroll->enable();
+			light_text->enable();
+			light_rotation->enable();
+		}
+		else {
+			RaycasterBase::change_light_intensity(0.0f, true);
+			light_intensity_scroll->disable();
+			light_text->disable();
+			light_rotation->disable();
+		}
+	}
+	else if (source == scale_scroll) {
+		glutSetWindow(main_window_id);
+		reshape_callback(glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
+	}
+	else if (source == light_rotation) {
+		float light_val[16];
+		light_rotation->get_float_array_val(light_val);
+		printf("%.3f %.3f %.3f \n%.3f %.3f %.3f \n%.3f %.3f %.3f\n\n", 
+			light_val[0], light_val[1], light_val[2], light_val[4], light_val[5], light_val[6], 
+			light_val[8], light_val[9], light_val[10]);
+	}
+	glui_panel->sync_live();
 }
 
 /****************************************/
@@ -369,17 +373,14 @@ void UI::init_glui() {
 	GLUI_Scrollbar *step = new GLUI_Scrollbar(optimizations_panel, "Step", GLUI_SCROLL_HORIZONTAL, &RaycasterBase::raycaster.ray_step);
 	step->set_float_limits(RaycasterBase::ray_step_limits.x, RaycasterBase::ray_step_limits.y);
 	new GLUI_StaticText(optimizations_panel, "Image downscaling:");
-	resolution_text = new GLUI_StaticText(optimizations_panel, "");
-	char text[100];
-	sprintf(text, "  Resolution: %dx%d", ViewBase::view.dims.x, ViewBase::view.dims.y);
-	resolution_text->set_text(text);
+	resolution_text = new GLUI_StaticText(optimizations_panel, "  Resolution: ?");
 	scale_scroll = new GLUI_Scrollbar(optimizations_panel, "Scale", GLUI_SCROLL_HORIZONTAL, &viewport_scale, 0, glui_callback);
 	scale_scroll->set_float_limits(0.25f, 1.0f);
 
 	GLUI_Rollout *lighting_panel = new GLUI_Rollout(glui_panel, "Lighting", true);
 	light_enabled_checkbox = new GLUI_Checkbox(lighting_panel, "Enabled", 0, 0, glui_callback);
 	light_enabled_checkbox->set_int_val(1);
-	light_rotation = new GLUI_Rotation(lighting_panel, "Light position", light_rotate);
+	light_rotation = new GLUI_Rotation(lighting_panel, "Light position", NULL, 0, glui_callback);
 	light_rotation->set_spin(1.0);
 	light_text = new GLUI_StaticText(lighting_panel, "Intensity:");
 	light_intensity_scroll = new GLUI_Scrollbar(lighting_panel, "Intensity", GLUI_SCROLL_HORIZONTAL, &RaycasterBase::raycaster.light_kd);
