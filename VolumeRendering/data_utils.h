@@ -12,15 +12,7 @@
 #define MINIMUM(a,b) ((a)<(b)?(a):(b))
 #define CLAMP(x,low,high) (MINIMUM((high),MAXIMUM((low),(x))))		//vyhodit
 #define DEG_TO_RAD(a) ((a) * PI / 180)
-/*
-template<typename T>
-inline __host__ __device__ T clamp(T value, T minimum, T maximum)			
-{
-	value = MINIMUM(value, maximum);
-	value = MAXIMUM(value, minimum);
-    return value;
-}
-*/
+
 // float3 ops
 
 inline __host__ __device__ float3 operator-(float3 a)			
@@ -86,6 +78,16 @@ inline __host__ __device__ float4 operator*(float4 a, float4 b)
 inline __host__ __device__ float4 operator+(float4 a, float3 b)
 {
     return make_float4(a.x + b.x, a.y + b.y, a.z + b.z,  a.w);
+}
+
+inline __host__ __device__ float flmin(float a, float b)
+{
+  return a < b ? a : b;
+}
+
+inline __host__ __device__ float flmax(float a, float b)
+{
+  return a > b ? a : b;
 }
 
 // other

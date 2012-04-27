@@ -1,25 +1,22 @@
 #include "UI.h"
 
 char UI::app_name[256] = "VR:";
-ushort2 UI::window_size = {INT_WIN_WIDTH, INT_WIN_HEIGHT};
-bool UI::window_resize_flag = false;
-
-static Renderer **renderers;
-static int *renderer_id;
-static void (*draw_function)();
-static void (*exit_function)();
-
-
+bool UI::viewport_resized_flag = false;
+Renderer **UI::renderers;
+int *UI::renderer_id;
+void (*UI::draw_function)();
+void (*UI::exit_function)();
 
 static GLUI *glui_panel;
 static GLUI_Checkbox *ert_checkbox, *light_enabled_checkbox;
 static GLUI_Spinner *ert_spinner;
-static GLUI_Scrollbar *light_intensity_scroll;
-static GLUI_StaticText *light_text;
+static GLUI_Scrollbar *light_intensity_scroll, *scale_scroll;
+static GLUI_StaticText *light_text, *resolution_text, *gpu_name_text;
 static GLUI_Rotation *light_rotation;
 
 static int main_window_id, tf_editor_id;
 static int fullscreen = false, tf_editor_visible = true, glui_panel_visible = true;
+static float viewport_scale = 1.0f;
 static short4 mouse_state = {0, 0, GLUT_LEFT_BUTTON, GLUT_UP};
 static short2 auto_rotate = {0, 0};
 static char title_string[256];
@@ -34,12 +31,12 @@ static char renderer_names[RENDERER_COUNT][256] = {"CPU", "CUDA Straightforward"
 void set_renderer_callback(int id) {
 	if ((id < 0) || (id >= RENDERER_COUNT))
 		return;
-	*renderer_id = id;
+	*UI::renderer_id = id;
 	printf("Setting renderer: %s\n", renderer_names[id]);
 }
 
 void exit_callback(int value) {
-	exit_function();
+	UI::exit_function();
 }
 
 void sync_glui() {
@@ -81,6 +78,19 @@ void glui_callback(GLUI_Control *source) {
 			light_rotation->disable();
 		}
 	}
+	else if (source == scale_scroll) {
+		glutSetWindow(main_window_id);
+		int left, top, w = glutGet(GLUT_WINDOW_WIDTH), h = glutGet(GLUT_WINDOW_HEIGHT);
+		if (glui_panel_visible) 
+			GLUI_Master.get_viewport_area(&left, &top, &w, &h);
+		w = (int) (w * viewport_scale);
+		h = (int) (h * viewport_scale);
+		ViewBase::set_viewport_dims(make_ushort2(w, h));
+		UI::viewport_resized_flag = true;
+		char text[100];
+		sprintf(text, "  Resolution: %dx%d", w, h);
+		resolution_text->set_text(text);
+	}
 	glui_panel->sync_live();
 }
 
@@ -90,14 +100,14 @@ void glui_callback(GLUI_Control *source) {
 
 void display_callback(void) {
 	//printf("Main window display callback...\n");
-	draw_function();
-	sprintf(title_string, "%s %s @ %.2f ms / %.2f ms (%dx%d)", UI::app_name, renderer_names[*renderer_id], 
-		Profiler::time_ms, 0.0f, UI::window_size.x, UI::window_size.y);
+	UI::draw_function();
+	sprintf(title_string, "%s %s @ %.2f ms / %.2f ms (%dx%d)", UI::app_name, renderer_names[*UI::renderer_id], 
+		Profiler::time_ms, 0.0f, ViewBase::view.dims.x, ViewBase::view.dims.y);
 	glutSetWindowTitle(title_string);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, UI::window_size.x, UI::window_size.y, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, ViewBase::view.dims.x, ViewBase::view.dims.y, GL_RGBA, GL_UNSIGNED_BYTE, 0);
 	glBegin(GL_QUADS);
 	glTexCoord2f(0, 0); glVertex2f(0, 0);
 	glTexCoord2f(1, 0); glVertex2f(1, 0);
@@ -196,7 +206,19 @@ void reshape_callback(int w, int h) {
 	int left, top;
 	if (glui_panel_visible) 
 		GLUI_Master.get_viewport_area(&left, &top, &w, &h);
-	UI::set_viewport_size(w, h);
+	glutSetWindow(main_window_id);
+	glViewport(0, 0, w, h);
+	if (w >= 16 && h >= 16) {
+		glutSetWindow(tf_editor_id);										
+		glutPositionWindow(w/20, (h/20)*17);
+		glutReshapeWindow((w*18)/20, h/8);
+	}
+	w = (int) (w * viewport_scale);
+	h = (int) (h * viewport_scale);
+	if (w != ViewBase::view.dims.x || h != ViewBase::view.dims.y) {
+		ViewBase::set_viewport_dims(make_ushort2(w, h));
+		UI::viewport_resized_flag = true;
+	}
 }
 
 /****************************************/
@@ -250,7 +272,7 @@ void motion_tfe_callback(int x, int y) {
 	glutPostRedisplay();
 	RaycasterBase::update_transfer_fn();
 	for (int i=0; i < RENDERER_COUNT; i++)
-		renderers[i]->set_transfer_fn(RaycasterBase::raycaster);
+		UI::renderers[i]->set_transfer_fn(RaycasterBase::raycaster);
 }
 
 void mouse_tfe_callback(int button, int state, int x, int y) {
@@ -263,21 +285,6 @@ void mouse_tfe_callback(int button, int state, int x, int y) {
 /****************************************/
 // Common UI class functions
 /****************************************/
-
-void UI::set_viewport_size(int width, int height) {				
-	if (window_size.x == width && window_size.y == height)
-		return;
-	window_size.x = width;
-	window_size.y = height;
-	window_resize_flag = true;
-	if (window_size.x > 16 && window_size.y > 16) {
-		glutSetWindow(main_window_id);
-		glViewport(0, 0, window_size.x, window_size.y);
-		glutSetWindow(tf_editor_id);										
-		glutPositionWindow(window_size.x/20, (window_size.y/20)*17);
-		glutReshapeWindow((window_size.x*18)/20, window_size.y/8);
-	}
-}
 
 void UI::toggle_fullscreen(int update_mode) {
 	if (!update_mode)
@@ -311,6 +318,10 @@ void UI::toggle_auto_rotate(int update_mode) {
 		auto_rotate = make_short2(0, 0);
 }
 
+void UI::set_gpu_name(const char *name) {
+	gpu_name_text->set_text(name);
+}
+
 void UI::destroy() {
 	glutDestroyWindow(main_window_id);
 }
@@ -321,9 +332,9 @@ void UI::init_glui() {
 	glui_panel->set_main_gfx_window(main_window_id);
 
 	GLUI_Rollout *renderers_panel = new GLUI_Rollout(glui_panel, "Renderers", true);
-	new GLUI_StaticText(renderers_panel, "CPU:");
+	new GLUI_StaticText(renderers_panel, "CPU");
 	new GLUI_Button(renderers_panel, "CPU", 0, set_renderer_callback);
-	new GLUI_StaticText(renderers_panel, "GPU:");
+	gpu_name_text = new GLUI_StaticText(renderers_panel, "GPU");
 	new GLUI_Button(renderers_panel, "CUDA", 1, set_renderer_callback);
 	new GLUI_Button(renderers_panel, "CUDA CMem", 2, set_renderer_callback);
 	new GLUI_Button(renderers_panel, "CUDA GL Interop", 3, set_renderer_callback);
@@ -354,13 +365,16 @@ void UI::init_glui() {
 	ert_spinner = new GLUI_Spinner(optimizations_panel, "  Threshold", &RaycasterBase::raycaster.ray_threshold);
 	ert_spinner->set_float_limits(0.5f, 1.0f);
 	ert_spinner->set_speed(10.0f);
-	new GLUI_StaticText(optimizations_panel, "Ray sampling rate:");
-	GLUI_Scrollbar *step = new GLUI_Scrollbar(optimizations_panel, "Rate", GLUI_SCROLL_HORIZONTAL, &RaycasterBase::raycaster.ray_step);
+	new GLUI_StaticText(optimizations_panel, "Ray sampling step:");
+	GLUI_Scrollbar *step = new GLUI_Scrollbar(optimizations_panel, "Step", GLUI_SCROLL_HORIZONTAL, &RaycasterBase::raycaster.ray_step);
 	step->set_float_limits(RaycasterBase::ray_step_limits.x, RaycasterBase::ray_step_limits.y);
 	new GLUI_StaticText(optimizations_panel, "Image downscaling:");
-	new GLUI_StaticText(optimizations_panel, "  Resolution: x ");
-	GLUI_Scrollbar *scale = new GLUI_Scrollbar(optimizations_panel, "Scale", GLUI_SCROLL_HORIZONTAL);
-	scale->set_float_limits(0.25f, 1.0f);
+	resolution_text = new GLUI_StaticText(optimizations_panel, "");
+	char text[100];
+	sprintf(text, "  Resolution: %dx%d", ViewBase::view.dims.x, ViewBase::view.dims.y);
+	resolution_text->set_text(text);
+	scale_scroll = new GLUI_Scrollbar(optimizations_panel, "Scale", GLUI_SCROLL_HORIZONTAL, &viewport_scale, 0, glui_callback);
+	scale_scroll->set_float_limits(0.25f, 1.0f);
 
 	GLUI_Rollout *lighting_panel = new GLUI_Rollout(glui_panel, "Lighting", true);
 	light_enabled_checkbox = new GLUI_Checkbox(lighting_panel, "Enabled", 0, 0, glui_callback);
@@ -379,8 +393,10 @@ void UI::init_glui() {
 	/*new GLUI_Checkbox(controls_panel, "Data histogram");
 	new GLUI_Checkbox(controls_panel, "High precision (^4)");
 	new GLUI_Button(controls_panel, "Reset");*/
+
 	GLUI_Button *quit_button = new GLUI_Button(glui_panel, "Quit", 0, exit_callback);
 	quit_button->set_w(150);
+
 	GLUI_FileBrowser *fb = new GLUI_FileBrowser(glui_panel, "Load File");
 	new GLUI_StaticText(fb, "Current file: filename");
 	new GLUI_StaticText(fb, "Dimensions: x x ");
@@ -396,9 +412,11 @@ void UI::init(Renderer **rends, int *rend_id, void (*draw_fn)(), void (*exit_fn)
 	printf("Initializing GLUT...\n");
 	int dummy_i = 1;
     char* dummy = "";
+	
+	ushort2 view_size = ViewBase::view.dims;
     glutInit(&dummy_i, &dummy);
 	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_MULTISAMPLE);
-	glutInitWindowSize(window_size.x + 165, window_size.y);
+	glutInitWindowSize(view_size.x + 192, view_size.y);
 	glutInitWindowPosition(700, 1);
 
 	main_window_id = glutCreateWindow(app_name);
@@ -410,7 +428,7 @@ void UI::init(Renderer **rends, int *rend_id, void (*draw_fn)(), void (*exit_fn)
 	GLUI_Master.set_glutReshapeFunc(reshape_callback);
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_TEXTURE_2D);
-	glViewport(0, 0, window_size.x, window_size.y);
+	glViewport(0, 0, view_size.x, view_size.y);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     glMatrixMode(GL_PROJECTION);
@@ -418,7 +436,7 @@ void UI::init(Renderer **rends, int *rend_id, void (*draw_fn)(), void (*exit_fn)
     glOrtho(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
 	glClearColor(0.25, 0.25, 0.25, 1);
 
-	tf_editor_id = glutCreateSubWindow(main_window_id, window_size.x/20, (window_size.y/20)*17, (window_size.x*18)/20, window_size.y/8);
+	tf_editor_id = glutCreateSubWindow(main_window_id, view_size.x/20, (view_size.y/20)*17, (view_size.x*18)/20, view_size.y/8);
 	glutDisplayFunc(display_tfe_callback);
 	glutMouseFunc(mouse_tfe_callback);
 	glutMotionFunc(motion_tfe_callback);
@@ -452,7 +470,7 @@ void UI::print_usage() {
 	printf("    'wasd' and '7890' and left mouse button to manipulate camera rotation\n");
 	printf("    'r' to toggle autorotation\n");
 	printf("    'qe' and right mouse button to manipulate camera translation\n");
-	printf("    'op' to change ray sampling rate\n");
+	printf("    'op' to change ray sampling step size\n");
 	printf("    'nm' to change ray accumulation threshold\n");
 	printf("    'l' to toggle empty space leaping\n");
 	printf("    '[]' to change volume illumination intensity\n");

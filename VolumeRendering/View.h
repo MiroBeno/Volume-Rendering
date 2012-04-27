@@ -6,7 +6,7 @@
 #define INT_WIN_HEIGHT 1024
 
 struct View {
-	ushort2 size_px;
+	ushort2 dims;
 	float3 origin; 
 	float3 direction;  
 	float3 right_plane;
@@ -17,14 +17,14 @@ struct View {
 	__host__ __device__ void get_ray(short2 pos, float3 *origin_vector, float3 *direction_vector) {
 		if (perspective) {
 			*origin_vector = origin;
-			*direction_vector = direction + (right_plane * (float) (pos.x - size_px.x / 2));
-			*direction_vector = *direction_vector + (up_plane * (float) (pos.y - size_px.y / 2));
+			*direction_vector = direction + (right_plane * (float) (pos.x - dims.x / 2));
+			*direction_vector = *direction_vector + (up_plane * (float) (pos.y - dims.y / 2));
 			//*direction_vector = vector_normalize(*direction_vector);
 		}
 		else {
 			*direction_vector = direction;
-			*origin_vector = origin + (right_plane * (float) (pos.x - size_px.x / 2));
-			*origin_vector = *origin_vector + (up_plane * (float) (pos.y - size_px.y / 2));
+			*origin_vector = origin + (right_plane * (float) (pos.x - dims.x / 2));
+			*origin_vector = *origin_vector + (up_plane * (float) (pos.y - dims.y / 2));
 		}
 	}
 };
@@ -42,7 +42,7 @@ class ViewBase {
 		static void light_right(int pixels);
 		static void set_camera_position(float distance, float vert_angle, float horiz_angle);
 		static void toggle_perspective(int update_mode);
-		static void set_window_size(ushort2 px);
+		static void set_viewport_dims(ushort2 px);
 	private:
 		static const float2 distance_limits;
 		static float3 cam_position;

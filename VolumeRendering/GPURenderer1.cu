@@ -27,7 +27,7 @@ GPURenderer1::~GPURenderer1() {
 
 static __global__ void render_ray(Raycaster raycaster, uchar4 dev_buffer[]) {
 	short2 pos = {blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y};
-	if ((pos.x >= raycaster.view.size_px.x) || (pos.y >= raycaster.view.size_px.y))	// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
+	if ((pos.x >= raycaster.view.dims.x) || (pos.y >= raycaster.view.dims.y))	// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
 		return;
 
 	float3 origin, direction;
@@ -72,10 +72,10 @@ void GPURenderer1::set_transfer_fn(Raycaster r) {
 void GPURenderer1::set_window_buffer(View view) {
 	if (dev_buffer != NULL)
 		cuda_safe_call(cudaFree(dev_buffer));
-	dev_buffer_size = view.size_px.x * view.size_px.y * 4;
+	dev_buffer_size = view.dims.x * view.dims.y * 4;
 	cuda_safe_call(cudaMalloc((void **)&dev_buffer, dev_buffer_size));
-	num_blocks = dim3((view.size_px.x + THREADS_PER_BLOCK.x - 1) / THREADS_PER_BLOCK.x, 
-					  (view.size_px.y + THREADS_PER_BLOCK.y - 1) / THREADS_PER_BLOCK.y);		
+	num_blocks = dim3((view.dims.x + THREADS_PER_BLOCK.x - 1) / THREADS_PER_BLOCK.x, 
+					  (view.dims.y + THREADS_PER_BLOCK.y - 1) / THREADS_PER_BLOCK.y);		
 			// celociselne delenie, ak su rozmery okna nedelitelne 16, spustaju sa bloky s nevyuzitimi threadmi
 }
 

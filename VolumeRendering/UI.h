@@ -12,13 +12,16 @@
 class UI {
 	public:
 		static char app_name[];
-		static ushort2 window_size;
-		static bool window_resize_flag;
+		static bool viewport_resized_flag;
+		static Renderer **renderers;
+		static int *renderer_id;
+		static void (*draw_function)();
+		static void (*exit_function)();
 		static void toggle_fullscreen(int update_mode);
 		static void toggle_tf_editor(int update_mode);
 		static void toggle_glui_panel(int update_mode);
 		static void toggle_auto_rotate(int update_mode);
-		static void set_viewport_size(int width, int height);
+		static void set_gpu_name(const char *name);
 		static void destroy();
 		static void init(Renderer *rends[], int *rend_id, void (*draw_fn)(), void (*exit_fn)());
 		static void print_usage();

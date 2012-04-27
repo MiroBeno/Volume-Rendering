@@ -27,16 +27,19 @@ struct Raycaster {
 	float light_kd;
 
 	__host__ __device__ bool intersect(float3 pt, float3 dir, float2 *k) {  // mozne odchylky pri vypocte => hodnoty k mimo volume; riesi sa clampovanim vysledku na stenu
+		if (dir.x == 0) dir.x = 0.00001f;					// neosetrene NaN pri 0/0
+		if (dir.y == 0) dir.y = 0.00001f;
+		if (dir.z == 0) dir.z = 0.00001f;	
 		float3 k1 = (volume.min_bound - pt) / dir;			// ak je zlozka vektora rovnobezna s osou a teda so stenou kocky (dir == 0), tak
-		float3 k2 = (-volume.min_bound - pt) / dir;				// ak lezi bod v romedzi kocky v danej osi je vysledok (-oo; +oo), inak (-oo;-oo) alebo (+oo;+oo) 
-		k->x = MAXIMUM(MAXIMUM(MINIMUM(k1.x, k2.x), MINIMUM(k1.y, k2.y)),MINIMUM(k1.z, k2.z)); 
-		k->y = MINIMUM(MINIMUM(MAXIMUM(k1.x, k2.x), MAXIMUM(k1.y, k2.y)),MAXIMUM(k1.z, k2.z));
-		k->x = MAXIMUM(k->x, 0);							// ak x < 0 bod vzniku luca je vnutri kocky - zacneme nie vstupnym priesecnikom, ale bodom vzniku (k = 0)
+		float3 k2 = (-volume.min_bound - pt) / dir;				// ak lezi bod v rozmedzi kocky v danej osi je vysledok (-oo; +oo), inak (-oo;-oo) alebo (+oo;+oo) 
+		k->x = flmax( flmax(flmin(k1.x, k2.x), flmin(k1.y, k2.y)), flmin(k1.z, k2.z) ); 
+		k->y = flmin( flmin(flmax(k1.x, k2.x), flmax(k1.y, k2.y)), flmax(k1.z, k2.z) );
+		k->x = flmax(k->x, 0);							// ak x < 0 bod vzniku luca je vnutri kocky - zacneme nie vstupnym priesecnikom, ale bodom vzniku (k = 0)
 		return ((k->x < k->y) && (k->y > 0));				// nenulovy interval koeficientu k (existuje priesecnica) A vystupny bod lezi na luci	 
 	}	
 
 	__host__ __device__ void write_color(float4 color, short2 pos, uchar4 buffer[]) {
-		buffer[pos.y * view.size_px.x + pos.x] = 
+		buffer[pos.y * view.dims.x + pos.x] = 
 			make_uchar4( map_float_int(color.x, 256), 
 						map_float_int(color.y, 256), 
 						map_float_int(color.z, 256), 
@@ -85,12 +88,12 @@ struct Raycaster {
 		if (dir.y > 0) index.y++;
 		if (dir.z > 0) index.z++;
 		float3 kp = (volume.min_bound + (esl_block_size * index) - pt) / dir;
-		if (dir.x == 0) kp.x = 100;
+		if (dir.x == 0) kp.x = 100;	
 		if (dir.y == 0) kp.y = 100;
 		if (dir.z == 0) kp.z = 100;	
-		float dk = MINIMUM(kp.x, kp.y);
-		dk = MINIMUM(dk, kp.z);
-		dk = MAXIMUM(dk, 0);
+		float dk = flmin(kp.x, kp.y);
+		dk = flmin(dk, kp.z);
+		dk = flmax(dk, 0);
 		dk = floor(dk / ray_step) * ray_step;
 		k->x += dk;
 	}

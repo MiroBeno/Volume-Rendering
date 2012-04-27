@@ -47,7 +47,7 @@ __device__  bool sample_data_esl_texture(float3 pos) {
 }
 
 __device__ void shade_texture(float4 *color, float3 pos, float sample) {
-		if (color->w < 0.1f) 
+		if (color->w < 0.1f || raycaster.light_kd < 0.01f) 
 			return;
 		float3 light_dir = vector_normalize(raycaster.view.light_pos - pos);
 		float sample_l = tex3D(volume_texture, 
@@ -62,7 +62,7 @@ __device__ void shade_texture(float4 *color, float3 pos, float sample) {
 
 static __global__ void render_ray(uchar4 dev_buffer[]) {
 	short2 pos = {blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y};
-	if ((pos.x >= raycaster.view.size_px.x) || (pos.y >= raycaster.view.size_px.y))	// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
+	if ((pos.x >= raycaster.view.dims.x) || (pos.y >= raycaster.view.dims.y))	// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
 		return;
 
 	float3 origin, direction;

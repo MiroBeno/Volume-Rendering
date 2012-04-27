@@ -46,13 +46,15 @@ void reset_PBO_texture() {							// ! musi byt setnute main glut window, inak pa
 	delete_PBO_texture();
 	glGenBuffersARB(1, &pbo_gl_id);	
 	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_gl_id);
-	glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, UI::window_size.x * UI::window_size.y * 4, NULL, GL_STREAM_DRAW_ARB);		//GL_STREAM_DRAW_ARB|GL_DYNAMIC_DRAW_ARB ??  // int CHANNEL_COUNT = 4;
+	glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, 
+		ViewBase::view.dims.x * ViewBase::view.dims.y * 4, NULL, GL_STREAM_DRAW_ARB);		//GL_STREAM_DRAW_ARB|GL_DYNAMIC_DRAW_ARB ??  // int CHANNEL_COUNT = 4;
 	cuda_safe_call(cudaGraphicsGLRegisterBuffer(&pbo_cuda_id, pbo_gl_id, cudaGraphicsMapFlagsWriteDiscard));
 	glGenTextures(1, &tex_gl_id);
 	glBindTexture(GL_TEXTURE_2D, tex_gl_id);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, UI::window_size.x, UI::window_size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 
+		ViewBase::view.dims.x, ViewBase::view.dims.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }
 
 uchar4 *prepare_PBO() {							//GLubyte *
@@ -79,14 +81,13 @@ void finalize_PBO() {
 
 void draw_volume() {
 	//printf("Drawing volume...\n");
-	if (UI::window_resize_flag) {
-		if (UI::window_size.x == 0 || UI::window_size.y == 0)
+	if (UI::viewport_resized_flag) {
+		if (ViewBase::view.dims.x < 16 || ViewBase::view.dims.y < 16)
 			return;
 		reset_PBO_texture();
-		ViewBase::set_window_size(UI::window_size);
 		for (int i=0; i < RENDERER_COUNT; i++)
 			renderers[i]->set_window_buffer(ViewBase::view);
-		UI::window_resize_flag = false;
+		UI::viewport_resized_flag = false;
 	}
 	RaycasterBase::set_view(ViewBase::view);
 	uchar4 *pbo_array = prepare_PBO();
@@ -183,6 +184,8 @@ void init_cuda() {
 	printf("  Integrated:                               %s\n", device_prop.integrated ? "Yes" : "No");
 	printf("\n");
 
+	UI::set_gpu_name(device_prop.name);
+
 	cuda_safe_call(cudaGLSetGLDevice(gpu_id));
 
 //	cuda_safe_call(cudaEventCreate(&frame));
@@ -204,6 +207,7 @@ void benchmark() {
 int main(int argc, char **argv) {
 
 	bool benchmark_mode = false;
+	ushort2 viewport_dims = {INT_WIN_WIDTH, INT_WIN_HEIGHT};
 	for (int i = 1; i < argc; i++) {
 		char *arg = argv[i];
 		if (strncmp(arg, "-h", 2) == 0) {
@@ -214,15 +218,13 @@ int main(int argc, char **argv) {
 				printf("Error: Not enough arguments.\n");
 				return EXIT_FAILURE;
 			}
-			int width = atoi(argv[++i]);
-			int height = atoi(argv[++i]);
-			if (width <= 0 || height <= 0) {
+			viewport_dims.x = atoi(argv[++i]);
+			viewport_dims.y = atoi(argv[++i]);
+			if (viewport_dims.x <= 0 || viewport_dims.y <= 0) {
 				printf("Error: Non-positive size.\n");
 				return EXIT_FAILURE;
 			}
-			UI::window_size.x = (unsigned short) width;
-			UI::window_size.y = (unsigned short) height;
-			ViewBase::set_window_size(UI::window_size);
+			ViewBase::set_viewport_dims(viewport_dims);
 		} else if (strncmp(arg, "-b", 2) == 0) {
 			benchmark_mode = true;
 		} else {

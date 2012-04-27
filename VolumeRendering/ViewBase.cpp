@@ -34,7 +34,7 @@ void ViewBase::update_view() {										//dlzka najvacsej hrany je 2 a stred kva
 	//printf("vd:%4.2f %4.2f %4.2f\nup vector:%4.2f %4.2f %4.2f\nright vector:%4.2f %4.2f %4.2f\n\n", view.direction.x, view.direction.y, view.direction.z, view.up_plane.x, view.up_plane.y, view.up_plane.z, view.right_plane.x, view.right_plane.y, view.right_plane.z);
 	view.right_plane = vector_normalize(view.right_plane);		
 	view.up_plane = vector_normalize(view.up_plane);	
-	float step_px = virtual_view_size / MINIMUM(view.size_px.x, view.size_px.y);
+	float step_px = virtual_view_size / MINIMUM(view.dims.x, view.dims.y);
 	view.right_plane = view.right_plane * step_px;	
 	view.up_plane = view.up_plane * step_px;
 }
@@ -104,10 +104,10 @@ void ViewBase::toggle_perspective(int update_mode) {
 	update_view();
 }
 
-void ViewBase::set_window_size(ushort2 px) {
-	view.size_px = px; 
-	cam_pixel_delta.x = 180.0f / (MINIMUM(px.x, px.y));
-	cam_pixel_delta.y = (distance_limits.y - distance_limits.x) / (view.size_px.y / 2);
+void ViewBase::set_viewport_dims(ushort2 px) {
+	view.dims = px; 
+	//cam_pixel_delta.x = 180.0f / (MINIMUM(px.x, px.y));									// treba brat do uvahy scale
+	//cam_pixel_delta.y = (distance_limits.y - distance_limits.x) / (view.dims.y / 2);
 	update_view();
 }
 

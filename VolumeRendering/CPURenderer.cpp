@@ -38,9 +38,9 @@ inline static void render_ray(Raycaster raycaster, uchar4 buffer[], short2 pos) 
 }
 
 int CPURenderer::render_volume(uchar4 *buffer, Raycaster r) {
-	memset(buffer, 0, r.view.size_px.x * r.view.size_px.y * 4);
-	for(int row = 0; row < r.view.size_px.y; row++)
-		for(int col = 0; col < r.view.size_px.x; col++)	{
+	memset(buffer, 0, r.view.dims.x * r.view.dims.y * 4);
+	for(int row = 0; row < r.view.dims.y; row++)
+		for(int col = 0; col < r.view.dims.x; col++)	{
 			render_ray(r, buffer, make_short2(col, row));
 		}
 	return 0;
