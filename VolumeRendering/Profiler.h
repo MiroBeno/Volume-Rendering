@@ -7,6 +7,7 @@
 
 #define CONFIGURATION_COUNT 10
 #define MAX_SAMPLE_COUNT 1000
+#define LAST_SAMPLE_COUNT 300
 
 class Profiler {
 
@@ -26,6 +27,8 @@ public:
 	static float average(int renderer_id, int configuration);
 	static void dump(const char *filePath);
 	static float time_ms;
+	static float last_times[LAST_SAMPLE_COUNT];
+	static int last_times_counter;
 };
 
 #endif

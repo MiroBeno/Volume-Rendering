@@ -2,7 +2,7 @@
 
 #include "Profiler.h"
 
-using namespace std;
+//using namespace std;
 
 float Profiler::data[RENDERER_COUNT][CONFIGURATION_COUNT][MAX_SAMPLE_COUNT];
 int Profiler::counters[RENDERER_COUNT][CONFIGURATION_COUNT];
@@ -10,6 +10,8 @@ int Profiler::current_renderer, Profiler::current_configuration, Profiler::curre
 clock_t Profiler::last_clock;
 cudaEvent_t Profiler::start_event, Profiler::stop_event;
 float Profiler::time_ms;
+float Profiler::last_times[LAST_SAMPLE_COUNT];
+int Profiler::last_times_counter;
 
 void Profiler::init() {
 	reset();
@@ -28,6 +30,9 @@ void Profiler::reset() {
 			counters[r][c] = 0;
 	current_renderer = current_configuration = current_method = -1;
 	time_ms = -1;
+	for (int i = 0; i < LAST_SAMPLE_COUNT; i++)
+		last_times[i] = 0;
+	last_times_counter = 0;
 }
 
 void Profiler::start(int renderer_id, int configuration, int method) {
@@ -61,6 +66,8 @@ float Profiler::stop() {
 	}
 	// reset profiler control data
 	//current_renderer = current_configuration = current_method = -1;
+	last_times[last_times_counter] = time_ms;
+	last_times_counter = ++last_times_counter % LAST_SAMPLE_COUNT;
 	return time_ms;
 }
 
@@ -75,13 +82,13 @@ float Profiler::average(int renderer_id, int configuration) {
 }
 
 void Profiler::dump(const char *filePath) {
-	ofstream file(filePath);
+	std::ofstream file(filePath);
 	for (int r = 0; r < RENDERER_COUNT; r++) {
 		for (int c = 0; c < CONFIGURATION_COUNT; c++) {
 			file << average(r, c);
 			if (c < CONFIGURATION_COUNT - 1)
 				file << ", ";
 		}
-		file << endl;
+		file << std::endl;
 	}
 }

@@ -10,17 +10,21 @@ void (*UI::exit_function)();
 static GLUI *glui_panel;
 static GLUI_Checkbox *ert_checkbox, *light_enabled_checkbox;
 static GLUI_Spinner *ert_spinner;
-static GLUI_Scrollbar *light_intensity_scroll, *scale_scroll;
-static GLUI_StaticText *light_text, *resolution_text, *gpu_name_text;
+static GLUI_Scrollbar *ray_step_scroll, *light_intensity_scroll, *scale_scroll, *bg_color_scroll;
+static GLUI_StaticText *light_text, *resolution_text, *gpu_name_text, *file_name_text, *volume_dims_text;
 static GLUI_Rotation *light_rotation;
+static GLUI_FileBrowser *file_browser;
 
 static int main_window_id, tf_editor_id;
-static int fullscreen = false, tf_editor_visible = true, glui_panel_visible = true;
+static int fullscreen = false, tf_editor_visible = true, glui_panel_visible = true, profiler_graph_visible = false;
+static int2 pre_fullscreen_size;
+static float bg_color = 0.25f;
 static float viewport_scale = 1.0f;
 static short4 mouse_state = {0, 0, GLUT_LEFT_BUTTON, GLUT_UP};
 static short2 auto_rotate = {0, 0};
+static float4 profiler_pos = {0.7, 0.92, 0.98, 0.98};
+static float2 profiler_delta = {(profiler_pos.z - profiler_pos.x) / (LAST_SAMPLE_COUNT - 1), (profiler_pos.w - profiler_pos.y)};
 static char renderer_names[RENDERER_COUNT][256] = {"CPU", "CUDA Straightforward", "CUDA Constant Memory", "CUDA CM + GL interop", "CUDA CM + 3D Texture Memory + GLI"};
-/**/static float view_rotate[16] = { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 };
 static char text_buffer[200];
 
 /****************************************/
@@ -56,9 +60,26 @@ void sync_glui() {
 // Main graphic window callbacks
 /****************************************/
 
+void draw_profiler_graph() {
+	glBegin(GL_QUADS);
+	glColor4f(0, 0, 0, 0.2f);
+	glVertex2f(profiler_pos.x, profiler_pos.y); glVertex2f(profiler_pos.z, profiler_pos.y);
+	glVertex2f(profiler_pos.z, profiler_pos.w); glVertex2f(profiler_pos.x, profiler_pos.w);
+	glEnd();
+	glBegin(GL_QUAD_STRIP);
+	for (int i=0; i < LAST_SAMPLE_COUNT; i++) {
+		int index = (i + Profiler::last_times_counter) % LAST_SAMPLE_COUNT;
+		float sample = Profiler::last_times[index] / 50.f;
+		glColor4f(1 - (sample - 2.0f), 1 - (sample - 1.0f), 1 - (sample - 1.0f), 0.7f);
+		glVertex2f(profiler_pos.x + i * profiler_delta.x, profiler_pos.y);
+		glVertex2f(profiler_pos.x + i * profiler_delta.x, profiler_pos.y + flmin(sample, 1.0f) * profiler_delta.y);
+	}
+	glEnd();
+}
+
 void display_callback(void) {
 	//printf("Main window display callback...\n");
-	/**/float frame = Profiler::stop();
+	/**/float frame = 0;//Profiler::stop();
 	UI::draw_function();
 	sprintf(text_buffer, "%s %s @ %.2f ms / %.2f ms (%dx%d)", UI::app_name, renderer_names[*UI::renderer_id], 
 		Profiler::time_ms, frame, ViewBase::view.dims.x, ViewBase::view.dims.y);
@@ -67,12 +88,17 @@ void display_callback(void) {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, ViewBase::view.dims.x, ViewBase::view.dims.y, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	glEnable(GL_TEXTURE_2D);
+	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 	glBegin(GL_QUADS);
 	glTexCoord2f(0, 0); glVertex2f(0, 0);
 	glTexCoord2f(1, 0); glVertex2f(1, 0);
 	glTexCoord2f(1, 1); glVertex2f(1, 1);
 	glTexCoord2f(0, 1); glVertex2f(0, 1);
 	glEnd();
+	glDisable(GL_TEXTURE_2D);
+	if (profiler_graph_visible)
+		draw_profiler_graph();
 	glDisable(GL_BLEND);
 	glutSwapBuffers();
 }
@@ -117,6 +143,7 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		case 'r': UI::toggle_auto_rotate(false); break;
 		case 'c': UI::toggle_glui_panel(false); break;
 		case 't': UI::toggle_tf_editor(false); break;
+		case 'y': profiler_graph_visible = !profiler_graph_visible; break;
 		case 'f': UI::toggle_fullscreen(false); break;
 		case 'v': idle_callback(); break;
 	}
@@ -172,13 +199,9 @@ void reshape_callback(int w, int h) {
 		glutPositionWindow(w/20, (h/20)*17);
 		glutReshapeWindow((w*18)/20, h/8);
 	}
-	w = (int) (w * viewport_scale);
-	h = (int) (h * viewport_scale);
-	if (w != ViewBase::view.dims.x || h != ViewBase::view.dims.y) {
-		ViewBase::set_viewport_dims(make_ushort2(w, h));
-		UI::viewport_resized_flag = true;
-	}
-	sprintf(text_buffer, "  Resolution: %dx%d", w, h);
+	ViewBase::set_viewport_dims(w, h, viewport_scale);
+	UI::viewport_resized_flag = true;
+	sprintf(text_buffer, "  Resolution: %dx%d", ViewBase::view.dims.x, ViewBase::view.dims.y);
 	resolution_text->set_text(text_buffer);
 }
 
@@ -257,6 +280,7 @@ void glui_callback(GLUI_Control *source) {
 			RaycasterBase::change_ray_threshold(1, true);
 			ert_spinner->disable();
 		}
+		glui_panel->sync_live();
 	}
 	else if (source == light_enabled_checkbox) {
 		if (light_enabled_checkbox->get_int_val()) {
@@ -271,6 +295,7 @@ void glui_callback(GLUI_Control *source) {
 			light_text->disable();
 			light_rotation->disable();
 		}
+		glui_panel->sync_live();
 	}
 	else if (source == scale_scroll) {
 		glutSetWindow(main_window_id);
@@ -279,25 +304,47 @@ void glui_callback(GLUI_Control *source) {
 	else if (source == light_rotation) {
 		float light_val[16];
 		light_rotation->get_float_array_val(light_val);
-		printf("%.3f %.3f %.3f \n%.3f %.3f %.3f \n%.3f %.3f %.3f\n\n", 
+		/*printf("%.3f %.3f %.3f \n%.3f %.3f %.3f \n%.3f %.3f %.3f\n\n", 
 			light_val[0], light_val[1], light_val[2], light_val[4], light_val[5], light_val[6], 
-			light_val[8], light_val[9], light_val[10]);
+			light_val[8], light_val[9], light_val[10]);*/
 	}
-	glui_panel->sync_live();
+	else if (source == file_browser) {
+		int file_loaded = ModelBase::load_model(file_browser->get_file());
+		if (file_loaded == 0) {
+			RaycasterBase::set_volume(ModelBase::volume);
+			for (int i=0; i < RENDERER_COUNT; i++) {
+				UI::renderers[i]->set_volume(RaycasterBase::raycaster.volume);
+				UI::renderers[i]->set_transfer_fn(RaycasterBase::raycaster);
+			}
+			float ray_step_value = RaycasterBase::raycaster.ray_step;
+			ray_step_scroll->set_float_limits(RaycasterBase::ray_step_limits.x, RaycasterBase::ray_step_limits.y);
+			ray_step_scroll->set_float_val(ray_step_value);
+			sprintf(text_buffer, "File: %s", file_browser->get_file());
+			file_name_text->set_text(text_buffer);
+			sprintf(text_buffer, "Dimensions: %dx%dx%d", ModelBase::volume.dims.x, ModelBase::volume.dims.y, ModelBase::volume.dims.z);
+			volume_dims_text->set_text(text_buffer);
+		}
+	}
+	else if (source == bg_color_scroll) {
+		glutSetWindow(main_window_id);
+		glClearColor(bg_color, bg_color, bg_color, 1);
+	}
 }
 
 /****************************************/
-// Common UI class functions
+// Public UI class functions
 /****************************************/
 
 void UI::toggle_fullscreen(int update_mode) {
 	if (!update_mode)
 		fullscreen = !fullscreen;
 	glutSetWindow(main_window_id);
-	if (fullscreen) 
+	if (fullscreen) {
+		pre_fullscreen_size = make_int2(glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
 		glutFullScreen();
+	}
 	else 
-		glutReshapeWindow(512, 512);
+		glutReshapeWindow(pre_fullscreen_size.x, pre_fullscreen_size.y);
 }
 
 void UI::toggle_tf_editor(int update_mode) {
@@ -323,7 +370,7 @@ void UI::toggle_auto_rotate(int update_mode) {
 }
 
 void UI::set_gpu_name(const char *name) {
-	gpu_name_text->set_text(name);
+	gpu_name_text->set_text(name);					// osetrit velkost
 }
 
 void UI::destroy() {
@@ -347,15 +394,13 @@ void UI::init_glui() {
 	GLUI_Rollout *view_panel = new GLUI_Rollout(glui_panel, "View", true);
 	GLUI_Panel *camera_panel = new GLUI_Panel(view_panel, "", false);
 	new GLUI_Column(camera_panel, false);
-	GLUI_Rotation *rotation = 
-		new GLUI_Rotation(camera_panel, "Rotation", view_rotate);
+	GLUI_Rotation *rotation = new GLUI_Rotation(camera_panel, "Rotation", NULL, 0, glui_callback);
 	rotation->set_spin(1.0);
 	GLUI_Button *auto_rotate_button = new GLUI_Button(camera_panel, "Auto", 0, toggle_auto_rotate);
 	auto_rotate_button->set_h(18);
 	auto_rotate_button->set_w(18);
 	new GLUI_Column(camera_panel, false);
-	GLUI_Translation *translation = 
-		new GLUI_Translation(camera_panel, "Translation", GLUI_TRANSLATION_Z, NULL);
+	GLUI_Translation *translation = new GLUI_Translation(camera_panel, "Translation", GLUI_TRANSLATION_Z, NULL);
 	translation->set_speed(0.005f);
 	GLUI_RadioGroup *projection = new GLUI_RadioGroup(view_panel, (int *) &ViewBase::view.perspective, true, ViewBase::toggle_perspective);
 	projection->set_alignment(GLUI_ALIGN_CENTER);
@@ -370,8 +415,8 @@ void UI::init_glui() {
 	ert_spinner->set_float_limits(0.5f, 1.0f);
 	ert_spinner->set_speed(10.0f);
 	new GLUI_StaticText(optimizations_panel, "Ray sampling step:");
-	GLUI_Scrollbar *step = new GLUI_Scrollbar(optimizations_panel, "Step", GLUI_SCROLL_HORIZONTAL, &RaycasterBase::raycaster.ray_step);
-	step->set_float_limits(RaycasterBase::ray_step_limits.x, RaycasterBase::ray_step_limits.y);
+	ray_step_scroll = new GLUI_Scrollbar(optimizations_panel, "Step", GLUI_SCROLL_HORIZONTAL, &RaycasterBase::raycaster.ray_step);
+	ray_step_scroll->set_float_limits(RaycasterBase::ray_step_limits.x, RaycasterBase::ray_step_limits.y);
 	new GLUI_StaticText(optimizations_panel, "Image downscaling:");
 	resolution_text = new GLUI_StaticText(optimizations_panel, "  Resolution: ?");
 	scale_scroll = new GLUI_Scrollbar(optimizations_panel, "Scale", GLUI_SCROLL_HORIZONTAL, &viewport_scale, 0, glui_callback);
@@ -389,8 +434,11 @@ void UI::init_glui() {
 	GLUI_Rollout *controls_panel = new GLUI_Rollout(glui_panel, "Controls", true);
 	new GLUI_Checkbox(controls_panel, "Fullscreen", &fullscreen, true, UI::toggle_fullscreen);
 	new GLUI_Checkbox(controls_panel, "Control panel", &glui_panel_visible, true, UI::toggle_glui_panel);
-	new GLUI_Checkbox(controls_panel, "Render time stats");
+	new GLUI_Checkbox(controls_panel, "Render time graph", &profiler_graph_visible);
 	new GLUI_Checkbox(controls_panel, "Transfer function editor", &tf_editor_visible, true, UI::toggle_tf_editor);
+	new GLUI_StaticText(controls_panel, "Background");
+	bg_color_scroll = new GLUI_Scrollbar(controls_panel, "Background", GLUI_SCROLL_HORIZONTAL, &bg_color, 0, glui_callback);
+	bg_color_scroll->set_float_limits(0.0f, 1.0f);
 	/*new GLUI_Checkbox(controls_panel, "Data histogram");
 	new GLUI_Checkbox(controls_panel, "High precision (^4)");
 	new GLUI_Button(controls_panel, "Reset");*/
@@ -398,10 +446,11 @@ void UI::init_glui() {
 	GLUI_Button *quit_button = new GLUI_Button(glui_panel, "Quit", 0, exit_callback);
 	quit_button->set_w(150);
 
-	GLUI_FileBrowser *fb = new GLUI_FileBrowser(glui_panel, "Load File");
-	new GLUI_StaticText(fb, "Current file: filename");
-	new GLUI_StaticText(fb, "Dimensions: x x ");
-	new GLUI_Column(fb, false);
+	file_browser = new GLUI_FileBrowser(glui_panel, "Load File", 1, 0, glui_callback);
+	file_name_text = new GLUI_StaticText(file_browser, "File: ?");
+	sprintf(text_buffer, "Dimensions: %dx%dx%d", ModelBase::volume.dims.x, ModelBase::volume.dims.y, ModelBase::volume.dims.z);
+	volume_dims_text = new GLUI_StaticText(file_browser, text_buffer);
+	new GLUI_Column(file_browser, false);
 }
 
 void UI::init(Renderer **rends, int *rend_id, void (*draw_fn)(), void (*exit_fn)()) {
@@ -413,7 +462,6 @@ void UI::init(Renderer **rends, int *rend_id, void (*draw_fn)(), void (*exit_fn)
 	printf("Initializing GLUT...\n");
 	int dummy_i = 1;
     char* dummy = "";
-	
 	ushort2 view_size = ViewBase::view.dims;
     glutInit(&dummy_i, &dummy);
 	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_MULTISAMPLE);
@@ -428,14 +476,13 @@ void UI::init(Renderer **rends, int *rend_id, void (*draw_fn)(), void (*exit_fn)
 	GLUI_Master.set_glutMouseFunc(mouse_callback);
 	GLUI_Master.set_glutReshapeFunc(reshape_callback);
 	glDisable(GL_DEPTH_TEST);
-	glEnable(GL_TEXTURE_2D);
 	glViewport(0, 0, view_size.x, view_size.y);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     glOrtho(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
-	glClearColor(0.25, 0.25, 0.25, 1);
+	glClearColor(bg_color, bg_color, bg_color, 1);
 
 	tf_editor_id = glutCreateSubWindow(main_window_id, view_size.x/20, (view_size.y/20)*17, (view_size.x*18)/20, view_size.y/8);
 	glutDisplayFunc(display_tfe_callback);
@@ -478,6 +525,7 @@ void UI::print_usage() {
 	printf("    middle mouse button to change light source position\n");
 	printf("    '-' to toggle perspective and orthogonal projection\n");
 	printf("    't' to toggle transfer function editor\n");
+	printf("    'y' to toggle render time graph\n");
 	printf("\n");
 }
 

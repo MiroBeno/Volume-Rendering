@@ -8,15 +8,11 @@ static __constant__ float4 transfer_fn[TF_SIZE];
 static __constant__ esl_type esl_volume[ESL_VOLUME_SIZE];
 
 GPURenderer2::GPURenderer2(Raycaster r) {
-	set_window_buffer(r.view);
 	set_transfer_fn(r);
-	set_volume(r.volume);
 }
 
 GPURenderer3::GPURenderer3(Raycaster r) {
-	set_window_buffer(r.view);
 	set_transfer_fn(r);
-	set_volume(r.volume);
 }
 
 static __global__ void render_ray(uchar4 dev_buffer[]) {

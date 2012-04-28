@@ -99,40 +99,44 @@ static __global__ void render_ray(uchar4 dev_buffer[]) {
 
 void GPURenderer4::set_transfer_fn(Raycaster r) {
 	if (transfer_fn_array == 0) {
-		cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<float4>();
-		cuda_safe_call(cudaMallocArray(&transfer_fn_array, &channelDesc, TF_SIZE, 1)); 
+		cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<float4>();
+		cuda_safe_call(cudaMallocArray(&transfer_fn_array, &channel_desc, TF_SIZE, 1)); 
 
 		transfer_fn_texture.filterMode = cudaFilterModeLinear; 
 		transfer_fn_texture.normalized = true;
 		transfer_fn_texture.addressMode[0] = cudaAddressModeClamp; 
-		cuda_safe_call(cudaBindTextureToArray(transfer_fn_texture, transfer_fn_array, channelDesc));
+		cuda_safe_call(cudaBindTextureToArray(transfer_fn_texture, transfer_fn_array, channel_desc));
 	}
 	cuda_safe_call(cudaMemcpyToArray(transfer_fn_array, 0, 0, r.transfer_fn, TF_SIZE * sizeof(float4), cudaMemcpyHostToDevice));
 	/**/cuda_safe_call(cudaMemcpyToSymbol(transfer_fn, r.transfer_fn, TF_SIZE * sizeof(float4)));
 
 	if (esl_array == 0) {
-		cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<esl_type>();	
-		cuda_safe_call(cudaMallocArray(&esl_array, &channelDesc, ESL_VOLUME_DIMS, ESL_VOLUME_DIMS));
+		cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<esl_type>();	
+		cuda_safe_call(cudaMallocArray(&esl_array, &channel_desc, ESL_VOLUME_DIMS, ESL_VOLUME_DIMS));
 
 		esl_texture.normalized = false;
 		esl_texture.filterMode = cudaFilterModePoint;  
 		esl_texture.addressMode[0] = cudaAddressModeClamp;  
 		esl_texture.addressMode[1] = cudaAddressModeClamp;
-		cuda_safe_call(cudaBindTextureToArray(esl_texture, esl_array, channelDesc));
+		cuda_safe_call(cudaBindTextureToArray(esl_texture, esl_array, channel_desc));
 	}
 	cuda_safe_call(cudaMemcpyToArray(esl_array, 0, 0, r.esl_volume, ESL_VOLUME_SIZE * sizeof(esl_type), cudaMemcpyHostToDevice));
 	//cuda_safe_call(cudaMemcpyToSymbol(esl_volume, r.esl_volume, ESL_VOLUME_SIZE * sizeof(esl_type)));
 }
 
 void GPURenderer4::set_volume(Model volume) {
-	cudaExtent volumeDims = {volume.dims.x, volume.dims.y, volume.dims.z};	
-	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<unsigned char>();	
-	cuda_safe_call(cudaMalloc3DArray(&volume_array, &channelDesc, volumeDims));
+	if (volume_array == 0) {
+		cuda_safe_call(cudaUnbindTexture(volume_texture));
+		cuda_safe_call(cudaFreeArray(volume_array));
+	}
+	cudaExtent volume_dims = {volume.dims.x, volume.dims.y, volume.dims.z};	
+	cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<unsigned char>();	
+	cuda_safe_call(cudaMalloc3DArray(&volume_array, &channel_desc, volume_dims));
 
     cudaMemcpy3DParms copyParams = {0};
-	copyParams.srcPtr   = make_cudaPitchedPtr(volume.data, volumeDims.width*sizeof(unsigned char), volumeDims.width, volumeDims.height);
+	copyParams.srcPtr   = make_cudaPitchedPtr(volume.data, volume_dims.width*sizeof(unsigned char), volume_dims.width, volume_dims.height);
     copyParams.dstArray = volume_array;
-    copyParams.extent   = volumeDims;
+    copyParams.extent   = volume_dims;
     copyParams.kind     = cudaMemcpyHostToDevice;
     cuda_safe_call(cudaMemcpy3D(&copyParams));
 
@@ -141,7 +145,7 @@ void GPURenderer4::set_volume(Model volume) {
     volume_texture.addressMode[0] = cudaAddressModeClamp;  
     volume_texture.addressMode[1] = cudaAddressModeClamp;
     volume_texture.addressMode[2] = cudaAddressModeClamp;
-    cuda_safe_call(cudaBindTextureToArray(volume_texture, volume_array, channelDesc));
+    cuda_safe_call(cudaBindTextureToArray(volume_texture, volume_array, channel_desc));
 }
 
 int GPURenderer4::render_volume(uchar4 *buffer, Raycaster r) {

@@ -104,10 +104,11 @@ void ViewBase::toggle_perspective(int update_mode) {
 	update_view();
 }
 
-void ViewBase::set_viewport_dims(ushort2 px) {
-	view.dims = px; 
-	//cam_pixel_delta.x = 180.0f / (MINIMUM(px.x, px.y));									// treba brat do uvahy scale
-	//cam_pixel_delta.y = (distance_limits.y - distance_limits.x) / (view.dims.y / 2);
+void ViewBase::set_viewport_dims(unsigned short viewport_x, unsigned short viewport_y, float viewport_scale) {
+	view.dims.x = (unsigned short) (viewport_x * viewport_scale);
+	view.dims.y = (unsigned short) (viewport_y * viewport_scale);
+	cam_pixel_delta.x = 180.0f / (MINIMUM(viewport_x, viewport_y));	
+	cam_pixel_delta.y = (distance_limits.y - distance_limits.x) / (viewport_y / 2);
 	update_view();
 }
 

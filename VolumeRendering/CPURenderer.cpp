@@ -2,9 +2,6 @@
 #include "Renderer.h"		
 
 CPURenderer::CPURenderer(Raycaster r) {
-	set_window_buffer(r.view);
-	set_volume(r.volume);
-	set_transfer_fn(r);
 }
 
 inline static void render_ray(Raycaster raycaster, uchar4 buffer[], short2 pos) {

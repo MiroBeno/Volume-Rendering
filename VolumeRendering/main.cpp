@@ -101,22 +101,6 @@ void draw_volume() {
 	//cuda_safe_call(cudaEventRecord(frame, 0));
 }
 
-void cleanup_and_exit() {
-	printf("Cleaning...\n");
-	//cuda_safe_call(cudaEventDestroy(frame));
-	delete_PBO_texture();
-	Profiler::destroy();
-	for (int i = RENDERER_COUNT - 1; i >=0 ; i--)
-		delete renderers[i];
-	free(ModelBase::volume.data);
-	free(RaycasterBase::raycaster.transfer_fn);
-	free(RaycasterBase::raycaster.esl_min_max);
-	free(RaycasterBase::raycaster.esl_volume);
-	UI::destroy();
-	printf("Bye!\n");
-	exit(EXIT_SUCCESS);
-}
-
 void init_cuda() {
 	printf("Initializing CUDA...\n");
     int device_count = 0;
@@ -204,6 +188,22 @@ void benchmark() {
 	Profiler::dump("profiler.txt");
 }
 
+void cleanup_and_exit() {
+	printf("Cleaning...\n");
+	//cuda_safe_call(cudaEventDestroy(frame));
+	delete_PBO_texture();
+	Profiler::destroy();
+	for (int i = RENDERER_COUNT - 1; i >=0 ; i--)
+		delete renderers[i];
+	free(ModelBase::volume.data);
+	free(RaycasterBase::raycaster.transfer_fn);
+	free(RaycasterBase::raycaster.esl_min_max);
+	free(RaycasterBase::raycaster.esl_volume);
+	UI::destroy();
+	printf("Bye!\n");
+	exit(EXIT_SUCCESS);
+}
+
 int main(int argc, char **argv) {
 
 	bool benchmark_mode = false;
@@ -224,7 +224,7 @@ int main(int argc, char **argv) {
 				printf("Error: Non-positive size.\n");
 				return EXIT_FAILURE;
 			}
-			ViewBase::set_viewport_dims(viewport_dims);
+			ViewBase::set_viewport_dims(viewport_dims.x, viewport_dims.y);
 		} else if (strncmp(arg, "-b", 2) == 0) {
 			benchmark_mode = true;
 		} else {

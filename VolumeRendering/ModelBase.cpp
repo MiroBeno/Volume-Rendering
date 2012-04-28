@@ -28,7 +28,8 @@ void ModelBase::compute_histogram() {
 }
 
 int ModelBase::load_model(const char* file_name) {
-	//free predosly
+	if (volume.data != NULL)
+		free(volume.data);
     const char *dot = strrchr(file_name, '.');
 	const char supported_ext[2][10] = {".raw", ".pvm"};
 	if (!dot || (strcmp(dot, supported_ext[0]) != 0 && strcmp(dot, supported_ext[1]) != 0)) {

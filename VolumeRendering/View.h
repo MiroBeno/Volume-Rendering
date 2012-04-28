@@ -42,7 +42,7 @@ class ViewBase {
 		static void light_right(int pixels);
 		static void set_camera_position(float distance, float vert_angle, float horiz_angle);
 		static void toggle_perspective(int update_mode);
-		static void set_viewport_dims(ushort2 px);
+		static void set_viewport_dims(unsigned short viewport_x, unsigned short viewport_y, float viewport_scale = 1.0f);
 	private:
 		static const float2 distance_limits;
 		static float3 cam_position;
