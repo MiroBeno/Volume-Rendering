@@ -1,10 +1,10 @@
 #ifndef _RENDERER_H_
 #define _RENDERER_H_
 
-#include "data_utils.h"
-#include "View.h"
-#include "Model.h"
-#include "Raycaster.h"
+#include "common.h"
+#include "ViewBase.h"
+#include "ModelBase.h"
+#include "RaycasterBase.h"
 
 class Renderer {
 	public:

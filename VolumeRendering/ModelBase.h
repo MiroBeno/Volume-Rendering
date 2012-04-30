@@ -1,7 +1,7 @@
 #ifndef _MODEL_H_
 #define _MODEL_H_
 
-#include "data_utils.h"
+#include "common.h"
 #include "ddsbase.h"
 
 struct Model {

@@ -1,13 +1,10 @@
 #ifndef _UI_H_
 #define _UI_H_
 
-#include "glew.h"
-#include "glui.h"
-
-#include "Raycaster.h"
+#include "common.h"
+#include "RaycasterBase.h"
 #include "Renderer.h"
 #include "Profiler.h"
-#include "constants.h"
 
 class UI {
 	public:

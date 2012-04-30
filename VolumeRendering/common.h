@@ -1,11 +1,13 @@
-#ifndef _DATA_UTILS_H_
-#define _DATA_UTILS_H_
+#ifndef _COMMON_H_
+#define _COMMON_H_
 
 #include <math.h>
 
 #include "host_defines.h"
 #include "vector_types.h"
 #include "vector_functions.h"
+
+#define RENDERER_COUNT 5
 
 #define PI 3.141592654f
 #define MAXIMUM(a,b) ((a)>(b)?(a):(b))

@@ -3,7 +3,7 @@
 
 #include <ctime>
 #include "cuda_utils.h"
-#include "constants.h"
+#include "common.h"
 
 #define CONFIGURATION_COUNT 10
 #define MAX_SAMPLE_COUNT 1000

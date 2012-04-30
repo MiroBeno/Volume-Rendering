@@ -2,29 +2,25 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "Model.h"
-#include "View.h"
-#include "Raycaster.h"
+#include "glew.h"
+#include "cuda_gl_interop.h"
+
+#include "ModelBase.h"
+#include "ViewBase.h"
+#include "RaycasterBase.h"
 #include "Renderer.h"
 #include "UI.h"
 #include "Profiler.h"
-#include "constants.h"
-
+#include "common.h"
 #include "cuda_utils.h"
-#include "cuda_gl_interop.h"
 
-//const char *FILE_NAME = "Bucky.pvm";						// 32x32x32 x 8bit
-//const char *FILE_NAME = "Foot.pvm";						// 256x256x256 x 8bit
 const char *FILE_NAME = "VisMale.pvm";					// 128x256x256 x 8bit
-//const char *FILE_NAME = "Bonsai1-LO.pvm";					// 512x512x182 x 16 bit
 
 static GLuint pbo_gl_id = NULL;
 static GLuint tex_gl_id = NULL;
 
 static int gpu_id;
-static cudaGraphicsResource *pbo_cuda_id;
-
-//static cudaEvent_t frame; 
+static cudaGraphicsResource *pbo_cuda_id; 
 
 static int renderer_id = 1;
 static Renderer *renderers[RENDERER_COUNT];
@@ -91,17 +87,26 @@ void draw_volume() {
 	}
 	RaycasterBase::set_view(ViewBase::view);
 	uchar4 *pbo_array = prepare_PBO();
-
 	Profiler::start(renderer_id, 0, renderer_id == 0 ? 0 : 1);
 	renderers[renderer_id]->render_volume(pbo_array, RaycasterBase::raycaster);
 	Profiler::stop();
-
-	//cuda_safe_call(cudaEventElapsedTime(&elapsed_time.y, frame, stop));
 	finalize_PBO();
-	//cuda_safe_call(cudaEventRecord(frame, 0));
 }
 
-void init_cuda() {
+void glew_init() {		// needs preceding initialization of OpenGL context, handled in glut
+	printf("Initializing GLEW version %s...\n", glewGetString(GLEW_VERSION));
+	GLenum err = glewInit();
+	if (GLEW_OK != err) {
+		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+		exit(EXIT_FAILURE);
+	}
+	if (!GLEW_VERSION_2_0) {
+		fprintf(stderr, "Error: OpenGL 2.0 is not supported\n");
+		exit(EXIT_FAILURE);
+	}
+}
+
+void cuda_init() {
 	printf("Initializing CUDA...\n");
     int device_count = 0;
 	if (cudaGetDeviceCount(&device_count) != cudaSuccess) {
@@ -171,9 +176,6 @@ void init_cuda() {
 	UI::set_gpu_name(device_prop.name);
 
 	cuda_safe_call(cudaGLSetGLDevice(gpu_id));
-
-//	cuda_safe_call(cudaEventCreate(&frame));
-//	cuda_safe_call(cudaEventRecord(frame, 0));
 }
 
 void benchmark() {
@@ -190,7 +192,6 @@ void benchmark() {
 
 void cleanup_and_exit() {
 	printf("Cleaning...\n");
-	//cuda_safe_call(cudaEventDestroy(frame));
 	delete_PBO_texture();
 	Profiler::destroy();
 	for (int i = RENDERER_COUNT - 1; i >=0 ; i--)
@@ -241,9 +242,8 @@ int main(int argc, char **argv) {
 	RaycasterBase::set_volume(ModelBase::volume);
 
 	UI::init(renderers, &renderer_id, draw_volume, cleanup_and_exit);
-	init_cuda();
-	reset_PBO_texture();
-
+	glew_init();		
+	cuda_init();
 	Profiler::init();
 
 	printf("Initializing renderers 0 - %d...\n", RENDERER_COUNT - 1);
@@ -258,9 +258,7 @@ int main(int argc, char **argv) {
 		cleanup_and_exit();
 	}
 
-	printf("Entering main event loop...\n");
 	//printf("Raycaster data size: %i B\n", sizeof(Raycaster));
-
 	UI::print_usage();
 	UI::start();
 	return EXIT_FAILURE;

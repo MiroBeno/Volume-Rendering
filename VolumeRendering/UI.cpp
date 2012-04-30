@@ -1,7 +1,8 @@
 #include "UI.h"
+#include "glui.h"		// includes glut.h
 
 char UI::app_name[256] = "VR:";
-bool UI::viewport_resized_flag = false;
+bool UI::viewport_resized_flag = true;
 Renderer **UI::renderers;
 int *UI::renderer_id;
 void (*UI::draw_function)();
@@ -500,17 +501,6 @@ void UI::init(Renderer **rends, int *rend_id, void (*draw_fn)(), void (*exit_fn)
 
 	init_glui();
 	glutSetWindow(main_window_id);
-
-	printf("Initializing GLEW version %s...\n", glewGetString(GLEW_VERSION));
-	GLenum err = glewInit();
-	if (GLEW_OK != err) {
-		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
-		exit(EXIT_FAILURE);
-	}
-	if (!GLEW_VERSION_2_0) {
-		fprintf(stderr, "Error: OpenGL 2.0 is not supported\n");
-		exit(EXIT_FAILURE);
-	}
 }
 
 void UI::print_usage() {
@@ -530,5 +520,6 @@ void UI::print_usage() {
 }
 
 void UI::start() {
+	printf("Entering main event loop...\n");
 	glutMainLoop();
 }

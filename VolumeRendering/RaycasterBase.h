@@ -1,9 +1,9 @@
 #ifndef _RAYCASTER_H_
 #define _RAYCASTER_H_
 
-#include "data_utils.h"
-#include "Model.h"
-#include "View.h"
+#include "common.h"
+#include "ModelBase.h"
+#include "ViewBase.h"
 
 #define ESL_MIN_BLOCK_SIZE 8
 #define ESL_VOLUME_DIMS 32

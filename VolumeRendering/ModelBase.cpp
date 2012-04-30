@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "Model.h"
+#include "ModelBase.h"
 
 Model ModelBase::volume = {	NULL,
 							0,

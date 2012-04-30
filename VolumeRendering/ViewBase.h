@@ -1,6 +1,6 @@
 #ifndef _VIEW_H_
 #define _VIEW_H_
-#include "data_utils.h"
+#include "common.h"
 
 #define INT_WIN_WIDTH 1024
 #define INT_WIN_HEIGHT 1024

@@ -1,5 +1,5 @@
-#include <stdio.h>
-#include "View.h"
+//#include <stdio.h>
+#include "ViewBase.h"
 
 View ViewBase::view = {	{INT_WIN_WIDTH, INT_WIN_HEIGHT}, 
 						{3, 0, 0},
@@ -100,7 +100,6 @@ void ViewBase::toggle_perspective(int update_mode) {
 	if (!update_mode)
 		view.perspective = !view.perspective;
 	virtual_view_size = view.perspective ? 1.5f : 3.0f;
-	printf("Perspective rays: %s\n", view.perspective ? "on" : "off");
 	update_view();
 }
 

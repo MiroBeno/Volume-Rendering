@@ -3,11 +3,6 @@
 #ifndef DDSBASE_H
 #define DDSBASE_H
 
-#include <stdio.h>
-#include <stdlib.h>
-
-#include "data_utils.h"
-
 #define BOOLINT char
 #ifndef TRUE
 #define TRUE (1)
@@ -15,15 +10,6 @@
 #ifndef FALSE
 #define FALSE (0)
 #endif
-#define ERRORMSG() errormsg(__FILE__,__LINE__)
-#define ffloor(x) floor((double)(x))
-#define ftrc(x) (int)ffloor(x)
-
-inline void errormsg(const char *file,int line)
-   {
-   fprintf(stderr,"Fatal error in <%s> at line %d!\n",file,line);
-   exit(EXIT_FAILURE);
-   }
 
 unsigned char *readRAWfile(const char *filename,unsigned int *bytes);
 

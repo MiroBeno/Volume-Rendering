@@ -1,5 +1,7 @@
 #include <stdio.h>
-#include "Raycaster.h"
+#include <stdlib.h>
+
+#include "RaycasterBase.h"
 
 Raycaster RaycasterBase::raycaster = {	
 							Model(),

@@ -1,8 +1,16 @@
 // (c) by Stefan Roettger // prevzane z http://code.google.com/p/vvv/
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
 #include <string.h>
 
 #include "ddsbase.h"
+
+#define ERRORMSG() errormsg(__FILE__,__LINE__)
+
+#define ffloor(x) floor((double)(x))
+#define ftrc(x) (int)ffloor(x)
 
 #define DDS_MAXSTR (256)
 
@@ -23,6 +31,12 @@ unsigned int DDS_buffer;
 unsigned int DDS_bufsize;
 
 unsigned short int DDS_INTEL=1;
+
+inline void errormsg(const char *file,int line)
+   {
+   fprintf(stderr,"Fatal error in <%s> at line %d!\n",file,line);
+   exit(EXIT_FAILURE);
+   }
 
 // helper functions for DDS:
 
