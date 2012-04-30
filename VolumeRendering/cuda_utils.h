@@ -13,14 +13,17 @@
 #include "texture_types.h"
 #include "texture_fetch_functions.h"
 
-static void __cuda_safe_call(cudaError_t err, const char *file, int line) {
+extern bool NO_SAFE;
+
+static inline void __cuda_safe_call(cudaError_t err, const char *file, int line) {
     if (err != cudaSuccess) {
 		fprintf(stderr, "CUDA fatal error: %s in %s at line %d\n", cudaGetErrorString(err), file, line);
-        exit(EXIT_FAILURE);
+        if (!NO_SAFE) 
+			exit(EXIT_FAILURE);
     }
 }
 
-static void __cuda_safe_check(const char *file, int line ) {
+static inline void __cuda_safe_check(const char *file, int line ) {
 	cudaError_t err = cudaGetLastError();
 	__cuda_safe_call(err, file, line);
 }

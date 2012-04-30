@@ -2,8 +2,8 @@
 #define _VIEW_H_
 #include "common.h"
 
-#define INT_WIN_WIDTH 1024
-#define INT_WIN_HEIGHT 1024
+#define INT_WIN_WIDTH 800
+#define INT_WIN_HEIGHT 680
 
 struct View {
 	ushort2 dims;

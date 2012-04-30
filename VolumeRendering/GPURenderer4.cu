@@ -47,7 +47,7 @@ __device__  bool sample_data_esl_texture(float3 pos) {
 }
 
 __device__ void shade_texture(float4 *color, float3 pos, float sample) {
-		if (color->w < 0.1f || raycaster.light_kd < 0.01f) 
+		if (color->w < 0.05f || raycaster.light_kd < 0.01f) 
 			return;
 		float3 light_dir = vector_normalize(raycaster.view.light_pos - pos);
 		float sample_l = tex3D(volume_texture, 

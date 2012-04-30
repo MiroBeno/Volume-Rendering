@@ -7,7 +7,7 @@
 
 #define ESL_MIN_BLOCK_SIZE 8
 #define ESL_VOLUME_DIMS 32
-#define ESL_VOLUME_SIZE 1024			//#define ESL_VOLUME_SIZE 32*32*32
+#define ESL_VOLUME_SIZE 1024			// ESL_VOLUME_DIMS^3 / sizeof(esl_type) / 8 bits
 #define TF_SIZE 128
 #define TF_RATIO 2						// 256 / TF_SIZE
 

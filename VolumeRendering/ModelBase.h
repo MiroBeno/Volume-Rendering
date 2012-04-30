@@ -23,6 +23,7 @@ class ModelBase {
 	public:
 		static Model volume;
 		static float histogram[256];
+		static char file_name[256];
 		static int load_model(const char* file_name);
 	private:
 		static void compute_histogram();

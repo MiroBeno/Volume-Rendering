@@ -14,15 +14,16 @@
 #include "common.h"
 #include "cuda_utils.h"
 
-const char *FILE_NAME = "VisMale.pvm";					// 128x256x256 x 8bit
+const char *INIT_FILE_NAME = "VisMale.pvm";	
+bool NO_SAFE = false;
 
 static GLuint pbo_gl_id = NULL;
 static GLuint tex_gl_id = NULL;
 
-static int gpu_id;
+static int gpu_id = 0;
 static cudaGraphicsResource *pbo_cuda_id; 
 
-static int renderer_id = 1;
+static int renderer_id = 4;
 static Renderer *renderers[RENDERER_COUNT];
 
 void delete_PBO_texture() {
@@ -38,7 +39,7 @@ void delete_PBO_texture() {
 }
 
 void reset_PBO_texture() {							// ! musi byt setnute main glut window, inak padne		// bug pri nastavenom downsampling a rozmere 0 pri cuda r
-	printf("Setting pixel buffer object...\n");
+	//printf("Setting pixel buffer object...\n");
 	delete_PBO_texture();
 	glGenBuffersARB(1, &pbo_gl_id);	
 	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_gl_id);
@@ -120,7 +121,7 @@ void cuda_init() {
 	printf("Number of CUDA devices found: %d\n", device_count);
   
 	cudaDeviceProp device_prop;
-	int max_compute_perf = 0, max_perf_device = -1, max_perf_device_cpm = 0, best_arch = 0;
+	int max_compute_perf = 0, max_perf_device = 0, max_perf_device_cpm = 0, best_arch = 0;
 	for (int i = 0; i < device_count; i++) {
 		cuda_safe_call(cudaGetDeviceProperties(&device_prop, i));
 		if ((!device_prop.tccDriver) &&
@@ -208,34 +209,68 @@ void cleanup_and_exit() {
 int main(int argc, char **argv) {
 
 	bool benchmark_mode = false;
-	ushort2 viewport_dims = {INT_WIN_WIDTH, INT_WIN_HEIGHT};
+	char file_name[256];
+	strcpy(file_name, INIT_FILE_NAME);
 	for (int i = 1; i < argc; i++) {
 		char *arg = argv[i];
 		if (strncmp(arg, "-h", 2) == 0) {
-			printf("VolumeRendering.exe [-h]\n");
+			printf("VolR - Volume rendering engine using CUDA, by Miroslav Beno, STU FIIT 2012\n\n");
+			printf("Usage:\n");
+			printf("VolR.exe [-h] [-f <filename>] [-r <id>] [-s <width> <height>] [-b] [-nosafe]\n");
+			printf("  -h : Show this help\n");
+			printf("  -f : Load specified file with volume data - either .pvm or .raw format\n");
+			printf("  -r : Set specified renderer: 0 - CPU, 1-4 GPU renderers\n");
+			printf("  -s : Set specified viewport size - must be in range <128; 2048>\n");
+			printf("  -b : Run in benchmark mode - can take a few minutes\n");
+			printf("  -nosafe : CUDA errors will not cause fatal exit - experimental\n");
 			return 0;
-		} else if (strncmp(arg, "-size", 5) == 0) {
-			if (i + 2 >= argc) {
-				printf("Error: Not enough arguments.\n");
-				return EXIT_FAILURE;
+		} else if (strncmp(arg, "-f", 2) == 0) {
+			if (i + 1 >= argc) {
+				printf("%s error: Not enough parameters. Use -h to help.\n", arg);
+				continue;
 			}
+			i++;
+			printf("Setting volume data file '%s'...\n", argv[i]);
+			strcpy(file_name, argv[i]);
+		} else if (strncmp(arg, "-r", 2) == 0) {
+			if (i + 1 >= argc) {
+				printf("%s error: Not enough parameters. Use -h to help.\n", arg);
+				continue;
+			}
+			int r_id = atoi(argv[++i]);
+			if (r_id < 0 || r_id >= RENDERER_COUNT) {
+				printf("%s error: Wrong parameters. Use -h to help.\n", arg);
+				continue;
+			}
+			printf("Setting initial renderer id %d...\n", r_id);
+			renderer_id = r_id;
+		} else if (strncmp(arg, "-s", 2) == 0) {
+			if (i + 2 >= argc) {
+				printf("%s error: Not enough parameters. Use -h to help.\n", arg);
+				continue;
+			}
+			ushort2 viewport_dims;
 			viewport_dims.x = atoi(argv[++i]);
 			viewport_dims.y = atoi(argv[++i]);
-			if (viewport_dims.x <= 0 || viewport_dims.y <= 0) {
-				printf("Error: Non-positive size.\n");
-				return EXIT_FAILURE;
+			if (viewport_dims.x < 128 || viewport_dims.y < 128 || viewport_dims.x > 2048 || viewport_dims.y > 2048) {
+				printf("%s error: Wrong parameters. Use -h to help.\n", arg);
+				continue;
 			}
+			printf("Setting viewport size %dx%d...\n", viewport_dims.x, viewport_dims.y);
 			ViewBase::set_viewport_dims(viewport_dims.x, viewport_dims.y);
 		} else if (strncmp(arg, "-b", 2) == 0) {
+			printf("Setting benchmark mode...\n");
 			benchmark_mode = true;
+		} else if (strncmp(arg, "-nosafe", 7) == 0) {
+			printf("Supressing CUDA errors...\n");
+			NO_SAFE = true;
 		} else {
 			printf("Warning: unknown argument: %s\n", arg);
 		}
 	}
 
-	if (ModelBase::load_model(FILE_NAME) != 0) {
+	if (ModelBase::load_model(file_name) != 0) 
 		exit(EXIT_FAILURE);
-	}
 
 	RaycasterBase::set_view(ViewBase::view);
 	RaycasterBase::reset_transfer_fn();

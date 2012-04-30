@@ -10,6 +10,7 @@ Model ModelBase::volume = {	NULL,
 							};
 
 float ModelBase::histogram[256];
+char ModelBase::file_name[256];
 
 void ModelBase::compute_histogram() {
 	unsigned int int_histogram[256];
@@ -96,6 +97,7 @@ int ModelBase::load_model(const char* file_name) {
 	volume.dims = make_ushort3(width, height, depth);
 	volume.size = size;
 	volume.data = loaded_data;
+	strcpy(ModelBase::file_name, file_name);
 	printf("File loaded: %s, volume size: %.2f MB\n\n", file_name, volume.size / (float)(1024 * 1024));
 	compute_histogram();
 

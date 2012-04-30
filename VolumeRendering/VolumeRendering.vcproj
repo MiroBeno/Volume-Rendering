@@ -2,7 +2,7 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="9,00"
-	Name="VolumeRendering"
+	Name="VolR"
 	ProjectGUID="{4250AC33-2D01-414D-95E2-8F86FF9EBAA3}"
 	RootNamespace="VolumeRendering"
 	Keyword="Win32Proj"
