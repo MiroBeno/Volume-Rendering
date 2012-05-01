@@ -11,6 +11,7 @@
 #include "Renderer.h"
 #include "UI.h"
 #include "Profiler.h"
+#include "Logger.h"
 #include "common.h"
 #include "cuda_utils.h"
 
@@ -88,37 +89,37 @@ void draw_volume() {
 	}
 	RaycasterBase::set_view(ViewBase::view);
 	uchar4 *pbo_array = prepare_PBO();
-	Profiler::start(renderer_id, 0, renderer_id == 0 ? 0 : 1);
+	Profiler::start(renderer_id, renderer_id == 0 ? 0 : 1);
 	renderers[renderer_id]->render_volume(pbo_array, RaycasterBase::raycaster);
 	Profiler::stop();
 	finalize_PBO();
 }
 
 void glew_init() {		// needs preceding initialization of OpenGL context, handled in glut
-	printf("Initializing GLEW version %s...\n", glewGetString(GLEW_VERSION));
+	Logger::log("Initializing GLEW version %s...\n", glewGetString(GLEW_VERSION));
 	GLenum err = glewInit();
 	if (GLEW_OK != err) {
-		fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+		Logger::log("Error: %s\n", glewGetErrorString(err));
 		exit(EXIT_FAILURE);
 	}
 	if (!GLEW_VERSION_2_0) {
-		fprintf(stderr, "Error: OpenGL 2.0 is not supported\n");
+		Logger::log("Error: OpenGL 2.0 is not supported\n");
 		exit(EXIT_FAILURE);
 	}
 }
 
 void cuda_init() {
-	printf("Initializing CUDA...\n");
+	Logger::log("Initializing CUDA...\n");
     int device_count = 0;
 	if (cudaGetDeviceCount(&device_count) != cudaSuccess) {
-		fprintf(stderr, "Error: Update your display drivers - need at least CUDA driver version 3.2\n");
+		Logger::log("Error: Update your display drivers - need at least CUDA driver version 3.2\n");
 	}
 	cuda_safe_check();
 	if (device_count == 0) {
-		fprintf(stderr, "Error: No device supporting CUDA found\n");
+		Logger::log("Error: No device supporting CUDA found\n");
 		exit(EXIT_FAILURE);
 	}
-	printf("Number of CUDA devices found: %d\n", device_count);
+	Logger::log("Number of CUDA devices found: %d\n", device_count);
   
 	cudaDeviceProp device_prop;
 	int max_compute_perf = 0, max_perf_device = 0, max_perf_device_cpm = 0, best_arch = 0;
@@ -154,45 +155,73 @@ void cuda_init() {
 	gpu_id = max_perf_device;
 
     cuda_safe_call(cudaGetDeviceProperties(&device_prop, gpu_id));
-    printf("\nUsing device %d: \"%s\"\n", gpu_id, device_prop.name);
+    Logger::log("\nUsing device %d: \"%s\"\n", gpu_id, device_prop.name);
 	int version = 0;
 	cuda_safe_call(cudaDriverGetVersion(&version));
-	printf("  CUDA Driver Version:                      %d.%d\n", version/1000, version%100);
+	Logger::log("  CUDA Driver Version:                      %d.%d\n", version/1000, version%100);
 	cuda_safe_call(cudaRuntimeGetVersion(&version));
-	printf("  CUDA Runtime Version:                     %d.%d\n", version/1000, version%100);
-    printf("  CUDA Capability version number:           %d.%d\n", device_prop.major, device_prop.minor);
+	Logger::log("  CUDA Runtime Version:                     %d.%d\n", version/1000, version%100);
+    Logger::log("  CUDA Capability version number:           %d.%d\n", device_prop.major, device_prop.minor);
 	if (max_perf_device_cpm != 0)
-		printf("  Multiprocessors x Cores/MP = Cores:       %d (MP) x %d (Cores/MP) = %d (Cores)\n", 
+		Logger::log("  Multiprocessors x Cores/MP = Cores:       %d (MP) x %d (Cores/MP) = %d (Cores)\n", 
 			device_prop.multiProcessorCount,
 			max_perf_device_cpm,
 			max_perf_device_cpm * device_prop.multiProcessorCount);
-	printf("  Total amount of global memory:            %lu MB\n", (unsigned long) device_prop.totalGlobalMem / (1024*1024));
-	printf("  Total amount of constant memory:          %u bytes\n", device_prop.totalConstMem); 
-	printf("  Total amount of shared memory per block:  %u bytes\n", device_prop.sharedMemPerBlock);
-	printf("  Total number of registers per block:	    %d\n", device_prop.regsPerBlock);
-	printf("  Clock rate:                               %.2f GHz\n", device_prop.clockRate * 1e-6f);
-	printf("  Integrated:                               %s\n", device_prop.integrated ? "Yes" : "No");
-	printf("\n");
+	Logger::log("  Total amount of global memory:            %lu MB\n", (unsigned long) device_prop.totalGlobalMem / (1024*1024));
+	Logger::log("  Total amount of constant memory:          %u bytes\n", device_prop.totalConstMem); 
+	Logger::log("  Total amount of shared memory per block:  %u bytes\n", device_prop.sharedMemPerBlock);
+	Logger::log("  Total number of registers per block:	    %d\n", device_prop.regsPerBlock);
+	Logger::log("  Clock rate:                               %.2f GHz\n", device_prop.clockRate * 1e-6f);
+	Logger::log("  Integrated:                               %s\n", device_prop.integrated ? "Yes" : "No");
+	Logger::log("\n");
 
 	UI::set_gpu_name(device_prop.name);
 
 	cuda_safe_call(cudaGLSetGLDevice(gpu_id));
 }
 
-void benchmark() {
-	printf("Entering benchmark loop...\n");
-	int sample_count[RENDERER_COUNT] = {0, 10, 10, 10, 10};
+void config_benchmark_loop() {
+	int draw_count[RENDERER_COUNT] = {1, 5, 5, 5, 5};
 	for(renderer_id = 0; renderer_id < RENDERER_COUNT; renderer_id++) {
-		// for configuration
-		for (int k = 0; k < sample_count[renderer_id]; k++) {
+		ViewBase::set_camera_position(3,0,0);
+		for (int k = 0; k < draw_count[renderer_id]; k++)
 			draw_volume();
-		}
+		ViewBase::set_camera_position(3,-45,-45);
+		for (int k = 0; k < draw_count[renderer_id]; k++)
+			draw_volume();
+		ViewBase::set_camera_position(3,-90,0);
+		for (int k = 0; k < draw_count[renderer_id]; k++)
+			draw_volume();
+		ViewBase::set_camera_position(3,180,-90);
+		for (int k = 0; k < draw_count[renderer_id]; k++)
+			draw_volume();
 	}
-	Profiler::dump("profiler.txt");
+}
+
+void benchmark() {
+	Logger::log("Entering benchmark loop...\n");
+
+	Logger::log("Default benchmark\n");
+	config_benchmark_loop();
+	Profiler::print_config(0);
+
+	Logger::log("ESL off benchmark\n");
+	RaycasterBase::toggle_esl();
+	Profiler::set_config(1);
+	config_benchmark_loop();
+	Profiler::print_config(1);
+
+	Logger::log("ESL and ERT off benchmark\n");
+	RaycasterBase::change_ray_threshold(1.0f, true);
+	Profiler::set_config(2);
+	config_benchmark_loop();
+	Profiler::print_config(2);
 }
 
 void cleanup_and_exit() {
-	printf("Cleaning...\n");
+	Logger::log("\nSummary profiler report:\n");
+	Profiler::print_config(0);
+	Logger::log("Cleaning...\n");
 	delete_PBO_texture();
 	Profiler::destroy();
 	for (int i = RENDERER_COUNT - 1; i >=0 ; i--)
@@ -202,70 +231,79 @@ void cleanup_and_exit() {
 	free(RaycasterBase::raycaster.esl_min_max);
 	free(RaycasterBase::raycaster.esl_volume);
 	UI::destroy();
-	printf("Bye!\n");
+	Logger::log("Bye!\n");
+	Logger::close();
 	exit(EXIT_SUCCESS);
 }
 
+void print_usage() {
+	printf("VolR - Volume rendering engine using CUDA, by Miroslav Beno, STU FIIT 2012\n\n");
+	printf("Usage:\n");
+	printf("VolR.exe [-h] [-f <filename>] [-r <id>] [-s <width> <height>] [-b] [-nosafe]\n");
+	printf("  -h : Show this help\n");
+	printf("  -f : Load specified file with volume data - either .pvm or .raw format\n");
+	printf("  -r : Set specified renderer: 0 - CPU, 1-4 GPU renderers\n");
+	printf("  -s : Set specified viewport size - must be in range <128; 2048>\n");
+	printf("  -b : Run in benchmark mode - can take a few minutes\n");
+	printf("  -nosafe : CUDA errors will not cause fatal exit - experimental\n");
+}
+
 int main(int argc, char **argv) {
+
+	if (strncmp(argv[1], "-h", 2) == 0) {
+		print_usage();
+		return(EXIT_SUCCESS);
+	}
+
+	Logger::init("VolR.log", 'w');
 
 	bool benchmark_mode = false;
 	char file_name[256];
 	strcpy(file_name, INIT_FILE_NAME);
 	for (int i = 1; i < argc; i++) {
 		char *arg = argv[i];
-		if (strncmp(arg, "-h", 2) == 0) {
-			printf("VolR - Volume rendering engine using CUDA, by Miroslav Beno, STU FIIT 2012\n\n");
-			printf("Usage:\n");
-			printf("VolR.exe [-h] [-f <filename>] [-r <id>] [-s <width> <height>] [-b] [-nosafe]\n");
-			printf("  -h : Show this help\n");
-			printf("  -f : Load specified file with volume data - either .pvm or .raw format\n");
-			printf("  -r : Set specified renderer: 0 - CPU, 1-4 GPU renderers\n");
-			printf("  -s : Set specified viewport size - must be in range <128; 2048>\n");
-			printf("  -b : Run in benchmark mode - can take a few minutes\n");
-			printf("  -nosafe : CUDA errors will not cause fatal exit - experimental\n");
-			return 0;
-		} else if (strncmp(arg, "-f", 2) == 0) {
+		if (strncmp(arg, "-f", 2) == 0) {
 			if (i + 1 >= argc) {
-				printf("%s error: Not enough parameters. Use -h to help.\n", arg);
+				Logger::log("%s error: Not enough parameters. Use -h to help.\n", arg);
 				continue;
 			}
 			i++;
-			printf("Setting volume data file '%s'...\n", argv[i]);
+			Logger::log("Setting volume data file '%s'...\n", argv[i]);
 			strcpy(file_name, argv[i]);
 		} else if (strncmp(arg, "-r", 2) == 0) {
 			if (i + 1 >= argc) {
-				printf("%s error: Not enough parameters. Use -h to help.\n", arg);
+				Logger::log("%s error: Not enough parameters. Use -h to help.\n", arg);
 				continue;
 			}
 			int r_id = atoi(argv[++i]);
 			if (r_id < 0 || r_id >= RENDERER_COUNT) {
-				printf("%s error: Wrong parameters. Use -h to help.\n", arg);
+				Logger::log("%s error: Wrong parameters. Use -h to help.\n", arg);
 				continue;
 			}
-			printf("Setting initial renderer id %d...\n", r_id);
+			Logger::log("Setting initial renderer id %d...\n", r_id);
 			renderer_id = r_id;
 		} else if (strncmp(arg, "-s", 2) == 0) {
 			if (i + 2 >= argc) {
-				printf("%s error: Not enough parameters. Use -h to help.\n", arg);
+				Logger::log("%s error: Not enough parameters. Use -h to help.\n", arg);
 				continue;
 			}
 			ushort2 viewport_dims;
 			viewport_dims.x = atoi(argv[++i]);
 			viewport_dims.y = atoi(argv[++i]);
 			if (viewport_dims.x < 128 || viewport_dims.y < 128 || viewport_dims.x > 2048 || viewport_dims.y > 2048) {
-				printf("%s error: Wrong parameters. Use -h to help.\n", arg);
+				Logger::log("%s error: Wrong parameters. Use -h to help.\n", arg);
 				continue;
 			}
-			printf("Setting viewport size %dx%d...\n", viewport_dims.x, viewport_dims.y);
+			Logger::log("Setting viewport size %dx%d...\n", viewport_dims.x, viewport_dims.y);
 			ViewBase::set_viewport_dims(viewport_dims.x, viewport_dims.y);
 		} else if (strncmp(arg, "-b", 2) == 0) {
-			printf("Setting benchmark mode...\n");
+			Logger::log("Setting benchmark mode...\n");
 			benchmark_mode = true;
 		} else if (strncmp(arg, "-nosafe", 7) == 0) {
-			printf("Supressing CUDA errors...\n");
+			Logger::log("Supressing CUDA errors...\n");
 			NO_SAFE = true;
 		} else {
-			printf("Warning: unknown argument: %s\n", arg);
+			Logger::log("Warning: unknown argument: %s\n", arg);
 		}
 	}
 
@@ -281,7 +319,7 @@ int main(int argc, char **argv) {
 	cuda_init();
 	Profiler::init();
 
-	printf("Initializing renderers 0 - %d...\n", RENDERER_COUNT - 1);
+	Logger::log("Initializing renderers 0 - %d...\n", RENDERER_COUNT - 1);
 	renderers[0] = new CPURenderer(RaycasterBase::raycaster);	
 	renderers[1] = new GPURenderer1(RaycasterBase::raycaster);
 	renderers[2] = new GPURenderer2(RaycasterBase::raycaster);

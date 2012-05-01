@@ -3,6 +3,8 @@
 
 #include <math.h>
 
+#include "Logger.h"
+
 #include "host_defines.h"
 #include "vector_types.h"
 #include "vector_functions.h"

@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "RaycasterBase.h"
@@ -22,22 +21,22 @@ float2 RaycasterBase::ray_step_limits;
 
 void RaycasterBase::change_ray_step(float step, bool reset) {
 	raycaster.ray_step = CLAMP(reset ? step : raycaster.ray_step + step, ray_step_limits.x, ray_step_limits.y);
-	printf("Ray sampling step: %.4f (approx %.1f sampling points)\n", raycaster.ray_step, 2/raycaster.ray_step);
+	Logger::log("Ray sampling step: %.4f (approx %.1f sampling points)\n", raycaster.ray_step, 2/raycaster.ray_step);
 }
 
 void RaycasterBase::change_ray_threshold(float threshold, bool reset) {
 	raycaster.ray_threshold = CLAMP(reset ? threshold : raycaster.ray_threshold + threshold, 0.5f, 1);
-	printf("Ray accumulation threshold: %.3f\n", raycaster.ray_threshold);
+	Logger::log("Ray accumulation threshold: %.3f\n", raycaster.ray_threshold);
 }
 
 void RaycasterBase::change_light_intensity(float intensity, bool reset) {
 	raycaster.light_kd = CLAMP(reset ? intensity : raycaster.light_kd + intensity, 0, 2);
-	printf("Light intensity: %.3f\n", raycaster.light_kd);
+	Logger::log("Light intensity: %.3f\n", raycaster.light_kd);
 }
 
 void RaycasterBase::toggle_esl() {
 	raycaster.esl = !raycaster.esl;
-	printf("Empty space leaping: %s\n", raycaster.esl ? "on" : "off");
+	Logger::log("Empty space leaping: %s\n", raycaster.esl ? "on" : "off");
 }
 
 void RaycasterBase::update_transfer_fn() {

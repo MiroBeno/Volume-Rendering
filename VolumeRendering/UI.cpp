@@ -42,7 +42,7 @@ void set_renderer_callback(int id) {
 	if ((id < 0) || (id >= RENDERER_COUNT))
 		return;
 	*UI::renderer_id = id;
-	printf("Setting renderer: %s\n", renderer_names[id]);
+	Logger::log("Setting renderer: %s\n", renderer_names[id]);
 }
 
 void reset_transfer_fn(int reset) {
@@ -168,12 +168,12 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		case 'o': RaycasterBase::change_ray_threshold(-0.05f, false); break;
 		case 'p': RaycasterBase::change_ray_threshold(0.05f, false); break;
 		case 'n':  	viewport_scale = MAXIMUM(0.25f, viewport_scale - 0.05f);
-					printf("Viewport scale factor: %.2f\n", viewport_scale);
+					Logger::log("Viewport scale factor: %.2f\n", viewport_scale);
 					glutSetWindow(main_window_id);
 					reshape_callback(glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
 					break;
 		case 'm':  	viewport_scale = MINIMUM(1.0f, viewport_scale + 0.05f);
-					printf("Viewport scale factor: %.2f\n", viewport_scale);
+					Logger::log("Viewport scale factor: %.2f\n", viewport_scale);
 					glutSetWindow(main_window_id);
 					reshape_callback(glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
 					break;
@@ -483,7 +483,7 @@ void UI::destroy() {
 }
 
 void UI::init_glui() {
-	printf("Initializing GLUI version %.2f...\n", GLUI_Master.get_version());
+	Logger::log("Initializing GLUI version %.2f...\n", GLUI_Master.get_version());
 	glui_panel = GLUI_Master.create_glui_subwindow(main_window_id, GLUI_SUBWINDOW_RIGHT);
 	glui_panel->set_main_gfx_window(main_window_id);
 
@@ -565,7 +565,7 @@ void UI::init(Renderer **rends, int *rend_id, void (*draw_fn)(), void (*exit_fn)
 	draw_function = draw_fn;
 	exit_function = exit_fn;
 
-	printf("Initializing GLUT...\n");
+	Logger::log("Initializing GLUT...\n");
 	int dummy_i = 1;
     char* dummy = "";
 	ushort2 view_size = ViewBase::view.dims;
@@ -635,6 +635,6 @@ void UI::print_usage() {
 }
 
 void UI::start() {
-	printf("Entering main event loop...\n");
+	Logger::log("Entering main event loop...\n");
 	glutMainLoop();
 }

@@ -2,7 +2,8 @@
 #define _CUDA_UTILS_H_
 
 #include <stdlib.h>
-#include <stdio.h>
+
+#include "Logger.h"
 
 #include "cuda_runtime_api.h"
 
@@ -17,7 +18,7 @@ extern bool NO_SAFE;
 
 static inline void __cuda_safe_call(cudaError_t err, const char *file, int line) {
     if (err != cudaSuccess) {
-		fprintf(stderr, "CUDA fatal error: %s in %s at line %d\n", cudaGetErrorString(err), file, line);
+		Logger::log("CUDA fatal error: %s in %s at line %d\n", cudaGetErrorString(err), file, line);
         if (!NO_SAFE) 
 			exit(EXIT_FAILURE);
     }

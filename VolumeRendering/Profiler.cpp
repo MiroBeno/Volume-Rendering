@@ -1,17 +1,17 @@
-#include <fstream>
+#include <time.h>
 
+#include "cuda_utils.h"
 #include "Profiler.h"
 
-//using namespace std;
-
-float Profiler::data[RENDERER_COUNT][CONFIGURATION_COUNT][MAX_SAMPLE_COUNT];
-int Profiler::counters[RENDERER_COUNT][CONFIGURATION_COUNT];
-int Profiler::current_renderer, Profiler::current_configuration, Profiler::current_method;
-clock_t Profiler::last_clock;
-cudaEvent_t Profiler::start_event, Profiler::stop_event;
+float Profiler::data[MAX_CONFIG_COUNT][RENDERER_COUNT][MAX_SAMPLE_COUNT];
+int Profiler::counters[MAX_CONFIG_COUNT][RENDERER_COUNT];
+int Profiler::current_config, Profiler::current_renderer, Profiler::current_method;
 float Profiler::time_ms;
 float Profiler::last_times[LAST_SAMPLE_COUNT];
 int Profiler::last_times_counter;
+
+static clock_t last_clock;
+static cudaEvent_t start_event, stop_event;
 
 void Profiler::init() {
 	reset();
@@ -25,19 +25,23 @@ void Profiler::destroy() {
 }
 
 void Profiler::reset() {
-	for (int r = 0; r < RENDERER_COUNT; r++)
-		for (int c = 0; c < CONFIGURATION_COUNT; c++)
-			counters[r][c] = 0;
-	current_renderer = current_configuration = current_method = -1;
+	for (int c = 0; c < MAX_CONFIG_COUNT; c++)
+		for (int r = 0; r < RENDERER_COUNT; r++)
+			counters[c][r] = 0;
+	current_renderer = current_method = -1;
+	current_config = 0;
 	time_ms = -1;
 	for (int i = 0; i < LAST_SAMPLE_COUNT; i++)
 		last_times[i] = 0;
 	last_times_counter = 0;
 }
 
-void Profiler::start(int renderer_id, int configuration, int method) {
-	current_renderer = renderer_id;
-	current_configuration = configuration;
+void Profiler::set_config(int config) {
+	current_config = CLAMP(config, 0, MAX_CONFIG_COUNT);
+}
+
+void Profiler::start(int renderer, int method) {
+	current_renderer = renderer;
 	current_method = method;
 	if (current_method == 0) {
 		last_clock = clock();
@@ -47,7 +51,7 @@ void Profiler::start(int renderer_id, int configuration, int method) {
 }
 
 float Profiler::stop() {
-	if (current_renderer == -1 || current_configuration == -1 || current_method == -1)
+	if (current_renderer == -1 || current_method == -1)
 		return -1;
 	// measure time
 	time_ms = -1;
@@ -59,36 +63,46 @@ float Profiler::stop() {
 		cuda_safe_call(cudaEventElapsedTime(&time_ms, start_event, stop_event));
 	}
 	// update measurements
-	int sample = counters[current_renderer][current_configuration];
+	int sample = counters[current_config][current_renderer];
 	if (sample < MAX_SAMPLE_COUNT) {
-		data[current_renderer][current_configuration][sample] = time_ms;
-		counters[current_renderer][current_configuration]++;
+		data[current_config][current_renderer][sample] = time_ms;
+		counters[current_config][current_renderer]++;
 	}
 	// reset profiler control data
-	//current_renderer = current_configuration = current_method = -1;
+	//current_renderer = current_method = -1;
 	last_times[last_times_counter] = time_ms;
 	last_times_counter = ++last_times_counter % LAST_SAMPLE_COUNT;
 	return time_ms;
 }
 
-float Profiler::average(int renderer_id, int configuration) {
-	int counter = counters[renderer_id][configuration];
+float Profiler::average(int config, int renderer) {
+	int counter = counters[config][renderer];
 	if (counter == 0) 
 		return -1;
 	float sum = 0;
 	for (int sample = 0; sample < counter; sample++)
-		sum += data[renderer_id][configuration][sample];
+		sum += data[config][renderer][sample];
 	return sum / counter;
 }
 
-void Profiler::dump(const char *filePath) {
-	std::ofstream file(filePath);
+float Profiler::maximum(int config, int renderer) {
+	int counter = counters[config][renderer];
+	float max_value = -1;
+	for (int sample = 0; sample < counter; sample++)
+		if (data[config][renderer][sample] > max_value)
+			max_value = data[config][renderer][sample];
+	return max_value;
+}
+
+void Profiler::print_config(int config) {
+	Logger::log("Renderer ID, Samples, Max (ms), Avg (ms)");
+	Logger::log("\n");
 	for (int r = 0; r < RENDERER_COUNT; r++) {
-		for (int c = 0; c < CONFIGURATION_COUNT; c++) {
-			file << average(r, c);
-			if (c < CONFIGURATION_COUNT - 1)
-				file << ", ";
-		}
-		file << std::endl;
+		Logger::log("%11i, ", r);
+		Logger::log("%7i, ", counters[config][r]);
+		Logger::log("%8.2f, ", maximum(config, r));
+		Logger::log("%8.2f", average(config, r));
+		Logger::log("\n");
 	}
+	Logger::log("\n");
 }
