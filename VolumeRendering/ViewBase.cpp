@@ -65,6 +65,8 @@ void ViewBase::camera_right(float angle) {
 void ViewBase::camera_zoom(float distance) {
 	cam_position.z = CLAMP(cam_position.z + distance, distance_limits.x, distance_limits.y);
 	view.origin = angles_to_point(&cam_position);
+	if (!view.perspective)
+		virtual_view_size = CLAMP(virtual_view_size + distance, distance_limits.x, distance_limits.y);
 	update_view();
 }
 
@@ -99,7 +101,7 @@ void ViewBase::light_right(int pixels) {
 void ViewBase::toggle_perspective(int update_mode) {
 	if (!update_mode)
 		view.perspective = !view.perspective;
-	virtual_view_size = view.perspective ? 1.5f : 3.0f;
+	virtual_view_size = view.perspective ? 1.5f : cam_position.z;
 	update_view();
 }
 

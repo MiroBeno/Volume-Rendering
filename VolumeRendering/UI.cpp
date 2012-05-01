@@ -15,7 +15,8 @@ static GLUI_Checkbox *ert_checkbox, *light_enabled_checkbox, *tfe_histogram_chec
 static GLUI_Spinner *ert_spinner;
 static GLUI_Scrollbar *ray_step_scroll, *light_intensity_scroll, *scale_scroll, *bg_color_scroll;
 static GLUI_StaticText *light_text, *resolution_text, *gpu_name_text, *file_name_text, *volume_dims_text;
-static GLUI_Rotation *light_rotation;
+static GLUI_Rotation *camera_rotation, *light_rotation;
+static GLUI_Translation *zoom_translation;
 static GLUI_FileBrowser *file_browser;
 
 static int main_window_id, tf_editor_id;
@@ -27,6 +28,7 @@ static float bg_color = 0.25f;
 static float viewport_scale = 1.0f;
 static short4 mouse_state = {0, 0, GLUT_LEFT_BUTTON, GLUT_UP};
 static short2 auto_rotate = {0, 0};
+static int last_zoom_value = 0;
 static float4 profiler_pos = {0.7, 0.92, 0.98, 0.98};
 static float2 profiler_delta = {(profiler_pos.z - profiler_pos.x) / (LAST_SAMPLE_COUNT - 1), (profiler_pos.w - profiler_pos.y)};
 static char renderer_names[RENDERER_COUNT][256] = {"CPU", "CUDA Straightforward", "CUDA Constant Memory", "CUDA CM + GL interop", "CUDA CM + 3D Texture Memory + GLI"};
@@ -386,12 +388,24 @@ void glui_callback(GLUI_Control *source) {
 		glutSetWindow(main_window_id);
 		reshape_callback(glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
 	}
+	else if (source == zoom_translation) {
+		int value = (int) (-zoom_translation->get_z());	  
+		ViewBase::camera_zoom(value - last_zoom_value); 
+		last_zoom_value = value;
+	}
+	else if (source == camera_rotation) {
+		float cam_val[16];
+		camera_rotation->get_float_array_val(cam_val);
+		printf("%.3f %.3f %.3f \n%.3f %.3f %.3f \n%.3f %.3f %.3f\n\n", 
+			cam_val[0], cam_val[1], cam_val[2], cam_val[4], cam_val[5], cam_val[6], 
+			cam_val[8], cam_val[9], cam_val[10]);
+	}
 	else if (source == light_rotation) {
 		float light_val[16];
 		light_rotation->get_float_array_val(light_val);
-		/*printf("%.3f %.3f %.3f \n%.3f %.3f %.3f \n%.3f %.3f %.3f\n\n", 
+		printf("%.3f %.3f %.3f \n%.3f %.3f %.3f \n%.3f %.3f %.3f\n\n", 
 			light_val[0], light_val[1], light_val[2], light_val[4], light_val[5], light_val[6], 
-			light_val[8], light_val[9], light_val[10]);*/
+			light_val[8], light_val[9], light_val[10]);
 	}
 	else if (source == file_browser) {
 		int file_loaded = ModelBase::load_model(file_browser->get_file());
@@ -485,14 +499,13 @@ void UI::init_glui() {
 	GLUI_Rollout *view_panel = new GLUI_Rollout(glui_panel, "View", true);
 		GLUI_Panel *camera_panel = new GLUI_Panel(view_panel, "", false);
 			new GLUI_Column(camera_panel, false);
-			GLUI_Rotation *rotation = new GLUI_Rotation(camera_panel, "Rotation", NULL, 0, glui_callback);
-				rotation->set_spin(1.0);
+			camera_rotation = new GLUI_Rotation(camera_panel, "Rotation", NULL, 0, glui_callback);
+				//camera_rotation->set_spin(1.0);
 			GLUI_Button *auto_rotate_button = new GLUI_Button(camera_panel, "Auto", 0, toggle_auto_rotate);
 				auto_rotate_button->set_h(18);
 				auto_rotate_button->set_w(18);
 			new GLUI_Column(camera_panel, false);
-			GLUI_Translation *translation = new GLUI_Translation(camera_panel, "Translation", GLUI_TRANSLATION_Z, NULL);
-				translation->set_speed(0.005f);
+			zoom_translation = new GLUI_Translation(camera_panel, "Zoom", GLUI_TRANSLATION_Z, NULL, 0, glui_callback);
 		GLUI_RadioGroup *projection = new GLUI_RadioGroup(view_panel, (int *) &ViewBase::view.perspective, true, ViewBase::toggle_perspective);
 			projection->set_alignment(GLUI_ALIGN_CENTER);
 			new GLUI_RadioButton(projection, "Orthogonal");
@@ -517,7 +530,7 @@ void UI::init_glui() {
 	light_enabled_checkbox = new GLUI_Checkbox(lighting_panel, "Enabled", 0, 0, glui_callback);
 		light_enabled_checkbox->set_int_val(1);
 	light_rotation = new GLUI_Rotation(lighting_panel, "Light position", NULL, 0, glui_callback);
-		light_rotation->set_spin(1.0);
+		//light_rotation->set_spin(1.0);
 	light_text = new GLUI_StaticText(lighting_panel, "Intensity:");
 	light_intensity_scroll = new GLUI_Scrollbar(lighting_panel, "Intensity", GLUI_SCROLL_HORIZONTAL, &RaycasterBase::raycaster.light_kd);
 		light_intensity_scroll->set_float_limits(0.0f, 2.0f);
@@ -598,7 +611,7 @@ void UI::init(Renderer **rends, int *rend_id, void (*draw_fn)(), void (*exit_fn)
 void UI::print_usage() {
 	printf("\nUse '`1234' to change renderer\n"); 
 	printf("    'wasd' and '7890' and left mouse button to manipulate camera rotation\n");
-	printf("    'qe' and right mouse button to manipulate camera translation\n");
+	printf("    'qe' and right mouse button to manipulate camera zoom\n");
 	printf("    '-' to toggle perspective and orthogonal projection\n");
 	printf("    'r' to toggle autorotation\n");
 	printf("    'f' to toggle fullscreen\n");
