@@ -32,25 +32,27 @@ struct View {
 class ViewBase {
 	public:
 		static View view;
-		static void camera_down(float angle);
-		static void camera_right(float angle);
-		static void camera_zoom(float distance);
-		static void camera_down(int pixels);
-		static void camera_right(int pixels);
-		static void camera_zoom(int pixels);
-		static void light_down(int pixels);
-		static void light_right(int pixels);
-		static void set_camera_position(float distance, float vert_angle, float horiz_angle);
-		static void toggle_perspective(int update_mode);
-		static void set_viewport_dims(unsigned short viewport_x, unsigned short viewport_y, float viewport_scale = 1.0f);
-	private:
-		static const float2 distance_limits;
-		static float3 cam_position;
-		static float3 light_position;
-		static float2 cam_pixel_delta;
-		static float virtual_view_size;
+		static float cam_matrix[16];
+		static float light_matrix[16];
 		static void update_view();
-		static float3 angles_to_point(float3 *angles);
+		static void camera_rotate(float3 angles, bool reset = false);
+		static void camera_rotate(int3 pixels);
+		static void camera_rotate(int2 pixels);
+		static void camera_zoom(float distance);
+		static void camera_zoom(int pixels);
+		static void set_camera_position(float3 angles, float distance);
+		static void light_rotate(int2 pixels);
+		static void toggle_perspective(int update_mode);
+		static void set_viewport_dims(ushort2 dims, float scale = 1.0f);
+	private:
+		static void matrix_rotate(float matrix[], float3 angles, bool reset);
+		static float3 vector_rotate(float4 v, float rot_matrix[16]);
+		static const float2 distance_limits;
+		static float4 cam_pos;
+		static float4 light_pos;
+		static float pixel_ratio_rotation;
+		static float pixel_ratio_translation;
+		static float virtual_view_size;
 };
 
 #endif

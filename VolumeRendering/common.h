@@ -11,11 +11,9 @@
 
 #define RENDERER_COUNT 5
 
-#define PI 3.141592654f
 #define MAXIMUM(a,b) ((a)>(b)?(a):(b))
 #define MINIMUM(a,b) ((a)<(b)?(a):(b))
 #define CLAMP(x,low,high) (MINIMUM((high),MAXIMUM((low),(x))))		//vyhodit
-#define DEG_TO_RAD(a) ((a) * PI / 180)
 
 // float3 ops
 
@@ -47,6 +45,10 @@ inline __host__ __device__ float3 operator-(float3 a, float3 b)
 inline __host__ __device__ float3 operator/(float3 a, float3 b)
 {
     return make_float3(a.x / b.x, a.y / b.y, a.z / b.z);
+}
+
+inline __host__ __device__ float dot_product(float4 a, float4 b) {					
+	return (a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w);
 }
 
 inline __host__ __device__ float3 cross_product(float3 a, float3 b) {					// vektorovy sucin

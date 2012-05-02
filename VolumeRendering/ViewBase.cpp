@@ -1,115 +1,110 @@
-//#include <stdio.h>
+#include "glew.h"
 #include "ViewBase.h"
 
 View ViewBase::view = {	{INT_WIN_WIDTH, INT_WIN_HEIGHT}, 
-						{3, 0, 0},
-						{-1, 0, 0},
+						{0, 0, 3},
+						{0, 0, -1},
 						make_float3(0, 0, -1) * (3.0f / MINIMUM(INT_WIN_WIDTH, INT_WIN_HEIGHT)),
 						make_float3(0, 1, 0) * (3.0f / MINIMUM(INT_WIN_WIDTH, INT_WIN_HEIGHT)),
-						{3, 0, 0},
+						{0, 0, 3},
 						false
 					 };
 
-const float2 ViewBase::distance_limits = {0.1f, 3};
-
-float3 ViewBase::cam_position = {0, 0, 3};			// x - horizontalny uhol, y - vertikalny uhol, z - vzdialenost
-float3 ViewBase::light_position = {0, 0, 3};	
-
-float2 ViewBase::cam_pixel_delta = {180.0f / (MINIMUM(INT_WIN_WIDTH, INT_WIN_HEIGHT)),					// pixel na uhol rotacie kamery
-									(distance_limits.y - distance_limits.x) / (INT_WIN_HEIGHT / 2)};			// pixel na vzdialenost kamery
+const float2 ViewBase::distance_limits = {0.1f, 3.0f};
+float4 ViewBase::cam_pos = {0, 0, 3, 1};
+float4 ViewBase::light_pos = {0, 0, 3, 1};	
+float ViewBase::cam_matrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+float ViewBase::light_matrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+float ViewBase::pixel_ratio_rotation = 180.0f / (MINIMUM(INT_WIN_WIDTH, INT_WIN_HEIGHT));					// pixel na uhol rotacie kamery
+float ViewBase::pixel_ratio_translation = (distance_limits.y - distance_limits.x) / (INT_WIN_HEIGHT / 2);	// pixel na vzdialenost kamery
 float ViewBase::virtual_view_size = 3.0f;		// velkost virtualneho okna v priestore
 
+float3 ViewBase::vector_rotate(float4 v, float rot_matrix[16]) {					
+	float3 r;
+	r.x = dot_product(v, make_float4(rot_matrix[0], rot_matrix[1], rot_matrix[2], rot_matrix[3]));
+    r.y = dot_product(v, make_float4(rot_matrix[4], rot_matrix[5], rot_matrix[6], rot_matrix[7]));
+    r.z = dot_product(v, make_float4(rot_matrix[8], rot_matrix[9], rot_matrix[10], rot_matrix[11]));
+	return r;
+}
+
+void ViewBase::matrix_rotate(float matrix[], float3 angles, bool reset) {
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+	if (reset) {
+		glLoadIdentity();
+		glGetFloatv(GL_MODELVIEW_MATRIX, matrix);
+	}
+	glLoadMatrixf(matrix);
+	glRotatef(angles.x, matrix[0], matrix[4], matrix[8]);
+    glRotatef(angles.y, matrix[1], matrix[5], matrix[9]);
+	glRotatef(angles.z, matrix[2], matrix[6], matrix[10]);
+    glGetFloatv(GL_MODELVIEW_MATRIX, matrix);
+    glPopMatrix();
+}
+
 void ViewBase::update_view() {										//dlzka najvacsej hrany je 2 a stred kvadra v [0,0,0]
-	view.direction = vector_normalize(-view.origin);				// pozicia kamery je uprostred viewu, smerujeme vzdy do [0,0,0] staci vynasobit -1 (= 0 - center)
-
-	if ((view.direction.x == 0) && (view.direction.z == 0))			// specialny pripad pri vektore rovnobeznom s osou y (nemozme pouzit vektor y na vypocet kolmeho vektora)
-		view.direction.x = 0.0001f;
-	
-	float3 y_vector = {0, 1, 0}; 
-	if ((cam_position.y > -PI/2) && (cam_position.y < PI/2)) 
-		y_vector = -y_vector;
-	view.right_plane = cross_product(y_vector, view.direction);		// pravidlo pravej ruky v pravotocivej sustave, vektorove nasobenie vrati pravy uhol na dva vektory
-	view.up_plane = cross_product(view.right_plane, view.direction);
-
-	//printf("vd:%4.2f %4.2f %4.2f\nup vector:%4.2f %4.2f %4.2f\nright vector:%4.2f %4.2f %4.2f\n\n", view.direction.x, view.direction.y, view.direction.z, view.up_plane.x, view.up_plane.y, view.up_plane.z, view.right_plane.x, view.right_plane.y, view.right_plane.z);
-	view.right_plane = vector_normalize(view.right_plane);		
-	view.up_plane = vector_normalize(view.up_plane);	
+    view.origin = vector_rotate(cam_pos, cam_matrix);
+	view.direction = vector_normalize(-view.origin);	
 	float step_px = virtual_view_size / MINIMUM(view.dims.x, view.dims.y);
-	view.right_plane = view.right_plane * step_px;	
-	view.up_plane = view.up_plane * step_px;
+	view.right_plane = vector_rotate(make_float4(1, 0, 0, 0), cam_matrix) * step_px;
+    view.up_plane = vector_rotate(make_float4(0, 1, 0, 0), cam_matrix) * step_px;
 }
 
-float3 ViewBase::angles_to_point(float3 *angles) {
-	while (angles->x < -PI) angles->x += 2 * PI;
-	while (angles->x >= PI) angles->x -= 2 * PI;
-	while (angles->y < -PI) angles->y += 2 * PI;
-	while (angles->y >= PI) angles->y -= 2 * PI;
-	float tmp = angles->z * cos(angles->y);
-	return make_float3(	tmp * cos(angles->x),
-						angles->z * sin(angles->y),
-						tmp * sin(angles->x));
-}
-
-void ViewBase::camera_down(float angle) {
-	cam_position.y += DEG_TO_RAD(angle);
-	view.origin = angles_to_point(&cam_position);
+void ViewBase::camera_rotate(float3 angles, bool reset) {
+	matrix_rotate(cam_matrix, angles, reset);
 	update_view();
 }
 
-void ViewBase::camera_right(float angle) {
-	cam_position.x += DEG_TO_RAD(angle); 
-	view.origin = angles_to_point(&cam_position);
-	update_view();
+void ViewBase::camera_rotate(int2 pixels) {
+	camera_rotate(make_float3(pixels.y * pixel_ratio_rotation, 
+								pixels.x * pixel_ratio_rotation, 
+								0));
+}
+
+void ViewBase::camera_rotate(int3 pixels) {
+	camera_rotate(make_float3(pixels.y * pixel_ratio_rotation, 
+								pixels.x * pixel_ratio_rotation, 
+								pixels.z * pixel_ratio_rotation));
 }
 
 void ViewBase::camera_zoom(float distance) {
-	cam_position.z = CLAMP(cam_position.z + distance, distance_limits.x, distance_limits.y);
-	view.origin = angles_to_point(&cam_position);
+	cam_pos.z = CLAMP(cam_pos.z + distance, distance_limits.x, distance_limits.y);
 	if (!view.perspective)
-		virtual_view_size = CLAMP(virtual_view_size + distance, distance_limits.x, distance_limits.y);
+		virtual_view_size = cam_pos.z;
 	update_view();
 }
 
-void ViewBase::camera_down(int pixels) {
-	camera_down(pixels * cam_pixel_delta.x);
-}
-
-void ViewBase::camera_right(int pixels) {
-	camera_right(pixels * cam_pixel_delta.x);
-}
-
 void ViewBase::camera_zoom(int pixels) {
-	camera_zoom(pixels * cam_pixel_delta.y);
+	camera_zoom(pixels * pixel_ratio_translation);
 }
 
-void ViewBase::set_camera_position(float distance, float vert_angle, float horiz_angle) {
-	cam_position.y = DEG_TO_RAD(vert_angle);
-	cam_position.x = DEG_TO_RAD(horiz_angle);
+void ViewBase::set_camera_position(float3 angles, float distance) {
+	cam_pos.z = 0;
 	camera_zoom(distance);
+	camera_rotate(angles, true);
 }
 
-void ViewBase::light_down(int pixels) {
-	light_position.y += DEG_TO_RAD(pixels * cam_pixel_delta.x);
-	view.light_pos = angles_to_point(&light_position);
-}
-
-void ViewBase::light_right(int pixels) {
-	light_position.x += DEG_TO_RAD(pixels * cam_pixel_delta.x); 
-	view.light_pos = angles_to_point(&light_position);
+void ViewBase::light_rotate(int2 pixels) {
+	matrix_rotate(light_matrix, 
+					make_float3(pixels.y * pixel_ratio_rotation, 
+								pixels.x * pixel_ratio_rotation, 
+								0),
+					false);
+	view.light_pos = vector_rotate(light_pos, light_matrix);
 }
 
 void ViewBase::toggle_perspective(int update_mode) {
 	if (!update_mode)
 		view.perspective = !view.perspective;
-	virtual_view_size = view.perspective ? 1.5f : cam_position.z;
+	virtual_view_size = view.perspective ? 1.5f : cam_pos.z;
 	update_view();
 }
 
-void ViewBase::set_viewport_dims(unsigned short viewport_x, unsigned short viewport_y, float viewport_scale) {
-	view.dims.x = (unsigned short) (viewport_x * viewport_scale);
-	view.dims.y = (unsigned short) (viewport_y * viewport_scale);
-	cam_pixel_delta.x = 180.0f / (MINIMUM(viewport_x, viewport_y));	
-	cam_pixel_delta.y = (distance_limits.y - distance_limits.x) / (viewport_y / 2);
+void ViewBase::set_viewport_dims(ushort2 dims, float scale) {
+	view.dims.x = (unsigned short) (dims.x * scale);
+	view.dims.y = (unsigned short) (dims.y * scale);
+	pixel_ratio_rotation = 180.0f / (MINIMUM(dims.x, dims.y));	
+	pixel_ratio_translation = (distance_limits.y - distance_limits.x) / (dims.y / 2);
 	update_view();
 }
 

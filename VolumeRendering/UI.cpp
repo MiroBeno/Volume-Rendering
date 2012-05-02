@@ -27,11 +27,10 @@ static int2 pre_fullscreen_size;
 static float bg_color = 0.25f;
 static float viewport_scale = 1.0f;
 static short4 mouse_state = {0, 0, GLUT_LEFT_BUTTON, GLUT_UP};
-static short2 auto_rotate = {0, 0};
+static int2 auto_rotate = {0, 0};
 static int last_zoom_value = 0;
 static float4 profiler_pos = {0.7, 0.92, 0.98, 0.98};
 static float2 profiler_delta = {(profiler_pos.z - profiler_pos.x) / (LAST_SAMPLE_COUNT - 1), (profiler_pos.w - profiler_pos.y)};
-static char renderer_names[RENDERER_COUNT][256] = {"CPU", "CUDA Straightforward", "CUDA Constant Memory", "CUDA CM + GL interop", "CUDA CM + 3D Texture Memory + GLI"};
 static char text_buffer[200];
 
 /****************************************/
@@ -42,7 +41,7 @@ void set_renderer_callback(int id) {
 	if ((id < 0) || (id >= RENDERER_COUNT))
 		return;
 	*UI::renderer_id = id;
-	Logger::log("Setting renderer: %s\n", renderer_names[id]);
+	Logger::log("Setting renderer: %s\n", UI::renderers[id]->get_name());
 }
 
 void reset_transfer_fn(int reset) {
@@ -112,7 +111,7 @@ void display_callback(void) {
 	//printf("Main window display callback...\n");
 	/**/float frame = 0; //Profiler::stop();
 	UI::draw_function();
-	sprintf(text_buffer, "%s %s @ %.2f ms / %.2f ms (%dx%d)", UI::app_name, renderer_names[*UI::renderer_id], 
+	sprintf(text_buffer, "%s %s @ %.2f ms / %.2f ms (%dx%d)", UI::app_name, UI::renderers[*UI::renderer_id]->get_name(), 
 		Profiler::time_ms, frame, ViewBase::view.dims.x, ViewBase::view.dims.y);
 	glutSetWindowTitle(text_buffer);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -128,10 +127,8 @@ void display_callback(void) {
 void idle_callback(void) {
 	//printf("Idle callback...\n");
 	if (mouse_state.w == GLUT_UP || mouse_state.z != GLUT_LEFT_BUTTON) {
-		if (auto_rotate.x != 0)
-			ViewBase::camera_right(auto_rotate.x);
-		if (auto_rotate.y != 0) 
-			ViewBase::camera_down(auto_rotate.y);
+		if (auto_rotate.x != 0 || auto_rotate.y != 0)
+			ViewBase::camera_rotate(auto_rotate);
 	}
 	glutSetWindow(main_window_id);
     glutPostRedisplay();
@@ -149,7 +146,7 @@ void reshape_callback(int w, int h) {
 		glutPositionWindow(w/20, (h/20)*17);
 		glutReshapeWindow((w*18)/20, h/8);
 	}
-	ViewBase::set_viewport_dims(w, h, viewport_scale);
+	ViewBase::set_viewport_dims(make_ushort2(w, h), viewport_scale);
 	UI::viewport_resized_flag = true;
 	sprintf(text_buffer, "  Resolution: %dx%d", ViewBase::view.dims.x, ViewBase::view.dims.y);
 	resolution_text->set_text(text_buffer);
@@ -157,12 +154,14 @@ void reshape_callback(int w, int h) {
 
 void keyboard_callback(unsigned char key, int x, int y) {
 	switch (key) {
-		case 'w': ViewBase::camera_down(-5.0f); break;
-		case 's': ViewBase::camera_down(5.0f); break;
-		case 'a': ViewBase::camera_right(-5.0f); break;
-		case 'd': ViewBase::camera_right(5.0f); break;
-		case 'q': ViewBase::camera_zoom(0.1f); break;
-		case 'e': ViewBase::camera_zoom(-0.1f); break;
+		case 'w': ViewBase::camera_rotate(make_float3(-5.0f, 0, 0)); break;
+		case 's': ViewBase::camera_rotate(make_float3(5.0f, 0, 0)); break;
+		case 'a': ViewBase::camera_rotate(make_float3(0, -5.0f, 0)); break;
+		case 'd': ViewBase::camera_rotate(make_float3(0, 5.0f, 0)); break;
+		case 'q': ViewBase::camera_zoom(-0.1f); break;
+		case 'e': ViewBase::camera_zoom(0.1f); break;
+		case 'z': ViewBase::camera_rotate(make_float3(0, 0, -5.0f)); break;
+		case 'x': ViewBase::camera_rotate(make_float3(0, 0, 5.0f)); break;
 		case 'k': RaycasterBase::change_ray_step(-0.001f, false); break;
 		case 'l': RaycasterBase::change_ray_step(0.001f, false); break;
 		case 'o': RaycasterBase::change_ray_threshold(-0.05f, false); break;
@@ -186,10 +185,10 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		case '2': set_renderer_callback(2); break;
 		case '3': set_renderer_callback(3); break;
 		case '4': set_renderer_callback(4); break;
-		case '7': ViewBase::set_camera_position(3,-45,-45); break;
-		case '8': ViewBase::set_camera_position(3,0,0); break;
-		case '9': ViewBase::set_camera_position(3,-90,0); break;
-		case '0': ViewBase::set_camera_position(3,180,-90); break;
+		case '7': ViewBase::set_camera_position(make_float3(-45,-45, 0), 3); break;
+		case '8': ViewBase::set_camera_position(make_float3(0,0,0), 3); break;
+		case '9': ViewBase::set_camera_position(make_float3(90,0,0), 3); break;
+		case '0': ViewBase::set_camera_position(make_float3(180,90,0), 3); break;
 		case 'r': UI::toggle_auto_rotate(false); break;
 		case 'c': UI::toggle_glui_panel(false); break;
 		case 't': UI::toggle_tf_editor(false); break;
@@ -220,10 +219,10 @@ void mouse_callback(int button, int state, int x, int y) {
 	mouse_state.w = state;
 	if (button == GLUT_LEFT_BUTTON) {
 		if (state == GLUT_DOWN) 
-			auto_rotate = make_short2(0, 0);
+			auto_rotate = make_int2(0, 0);
 		if (state == GLUT_UP) {
 			if (abs(auto_rotate.x) < 8 && abs(auto_rotate.y) < 8)
-				auto_rotate = make_short2(0, 0);
+				auto_rotate = make_int2(0, 0);
 		}
 	}
 }
@@ -232,15 +231,14 @@ void motion_callback(int x, int y) {
 	if (mouse_state.z == GLUT_LEFT_BUTTON) {	  
 		auto_rotate.x = x - mouse_state.x;
 		auto_rotate.y = y - mouse_state.y;
-		ViewBase::camera_right(auto_rotate.x); 
-		ViewBase::camera_down(auto_rotate.y);
+		ViewBase::camera_rotate(auto_rotate); 
 	}
 	if (mouse_state.z == GLUT_RIGHT_BUTTON) {	  
+		ViewBase::camera_rotate(make_int3(0, 0, x - mouse_state.x)); 
 		ViewBase::camera_zoom(y - mouse_state.y); 
 	}
 	if (mouse_state.z == GLUT_MIDDLE_BUTTON) {	  
-		ViewBase::light_right(x - mouse_state.x); 
-		ViewBase::light_down(y - mouse_state.y);
+		ViewBase::light_rotate(make_int2(x - mouse_state.x, y - mouse_state.y));
 	}
 	mouse_state.x = x;
 	mouse_state.y = y;
@@ -339,6 +337,7 @@ void mouse_tfe_callback(int button, int state, int x, int y) {
 		tf_editor_color = make_float3(pick_col[0] / 255.0f, pick_col[1] / 255.0f, pick_col[2] / 255.0f);
 		tfe_color_picker_visible = false;
 		glutPostRedisplay();
+		sync_glui();
 		return;
 	}
 	if (button == GLUT_MIDDLE_BUTTON && state == GLUT_UP) {
@@ -394,18 +393,10 @@ void glui_callback(GLUI_Control *source) {
 		last_zoom_value = value;
 	}
 	else if (source == camera_rotation) {
-		float cam_val[16];
-		camera_rotation->get_float_array_val(cam_val);
-		printf("%.3f %.3f %.3f \n%.3f %.3f %.3f \n%.3f %.3f %.3f\n\n", 
-			cam_val[0], cam_val[1], cam_val[2], cam_val[4], cam_val[5], cam_val[6], 
-			cam_val[8], cam_val[9], cam_val[10]);
+		ViewBase::update_view();
 	}
 	else if (source == light_rotation) {
-		float light_val[16];
-		light_rotation->get_float_array_val(light_val);
-		printf("%.3f %.3f %.3f \n%.3f %.3f %.3f \n%.3f %.3f %.3f\n\n", 
-			light_val[0], light_val[1], light_val[2], light_val[4], light_val[5], light_val[6], 
-			light_val[8], light_val[9], light_val[10]);
+		ViewBase::light_rotate(make_int2(0,0));
 	}
 	else if (source == file_browser) {
 		int file_loaded = ModelBase::load_model(file_browser->get_file());
@@ -469,9 +460,9 @@ void UI::toggle_glui_panel(int update_mode) {
 
 void UI::toggle_auto_rotate(int update_mode) {
 	if (auto_rotate.x == 0 && auto_rotate.y == 0) 
-		auto_rotate = make_short2(-5, -5);
+		auto_rotate = make_int2(-5, -5);
 	else 
-		auto_rotate = make_short2(0, 0);
+		auto_rotate = make_int2(0, 0);
 }
 
 void UI::set_gpu_name(const char *name) {
@@ -499,8 +490,7 @@ void UI::init_glui() {
 	GLUI_Rollout *view_panel = new GLUI_Rollout(glui_panel, "View", true);
 		GLUI_Panel *camera_panel = new GLUI_Panel(view_panel, "", false);
 			new GLUI_Column(camera_panel, false);
-			camera_rotation = new GLUI_Rotation(camera_panel, "Rotation", NULL, 0, glui_callback);
-				//camera_rotation->set_spin(1.0);
+			camera_rotation = new GLUI_Rotation(camera_panel, "Rotation", ViewBase::cam_matrix, 0, glui_callback);
 			GLUI_Button *auto_rotate_button = new GLUI_Button(camera_panel, "Auto", 0, toggle_auto_rotate);
 				auto_rotate_button->set_h(18);
 				auto_rotate_button->set_w(18);
@@ -529,8 +519,7 @@ void UI::init_glui() {
 	GLUI_Rollout *lighting_panel = new GLUI_Rollout(glui_panel, "Lighting", false);
 	light_enabled_checkbox = new GLUI_Checkbox(lighting_panel, "Enabled", 0, 0, glui_callback);
 		light_enabled_checkbox->set_int_val(1);
-	light_rotation = new GLUI_Rotation(lighting_panel, "Light position", NULL, 0, glui_callback);
-		//light_rotation->set_spin(1.0);
+	light_rotation = new GLUI_Rotation(lighting_panel, "Light position", ViewBase::light_matrix, 0, glui_callback);
 	light_text = new GLUI_StaticText(lighting_panel, "Intensity:");
 	light_intensity_scroll = new GLUI_Scrollbar(lighting_panel, "Intensity", GLUI_SCROLL_HORIZONTAL, &RaycasterBase::raycaster.light_kd);
 		light_intensity_scroll->set_float_limits(0.0f, 2.0f);
@@ -611,7 +600,8 @@ void UI::init(Renderer **rends, int *rend_id, void (*draw_fn)(), void (*exit_fn)
 void UI::print_usage() {
 	printf("\nUse '`1234' to change renderer\n"); 
 	printf("    'wasd' and '7890' and left mouse button to manipulate camera rotation\n");
-	printf("    'qe' and right mouse button to manipulate camera zoom\n");
+	printf("    'qe' and right mouse button vertically to manipulate camera zoom\n");
+	printf("    'zx' and right mouse button horizontally to manipulate camera orientation\n");
 	printf("    '-' to toggle perspective and orthogonal projection\n");
 	printf("    'r' to toggle autorotation\n");
 	printf("    'f' to toggle fullscreen\n");
@@ -635,6 +625,5 @@ void UI::print_usage() {
 }
 
 void UI::start() {
-	Logger::log("Entering main event loop...\n");
 	glutMainLoop();
 }

@@ -183,16 +183,16 @@ void cuda_init() {
 void config_benchmark_loop() {
 	int draw_count[RENDERER_COUNT] = {1, 5, 5, 5, 5};
 	for(renderer_id = 0; renderer_id < RENDERER_COUNT; renderer_id++) {
-		ViewBase::set_camera_position(3,0,0);
+		ViewBase::set_camera_position(make_float3(-45,-45, 0), 3);
 		for (int k = 0; k < draw_count[renderer_id]; k++)
 			draw_volume();
-		ViewBase::set_camera_position(3,-45,-45);
+		ViewBase::set_camera_position(make_float3(0,0,0), 3);
 		for (int k = 0; k < draw_count[renderer_id]; k++)
 			draw_volume();
-		ViewBase::set_camera_position(3,-90,0);
+		ViewBase::set_camera_position(make_float3(90,0,0), 3);
 		for (int k = 0; k < draw_count[renderer_id]; k++)
 			draw_volume();
-		ViewBase::set_camera_position(3,180,-90);
+		ViewBase::set_camera_position(make_float3(180,90,0), 3);
 		for (int k = 0; k < draw_count[renderer_id]; k++)
 			draw_volume();
 	}
@@ -295,7 +295,7 @@ int main(int argc, char **argv) {
 				continue;
 			}
 			Logger::log("Setting viewport size %dx%d...\n", viewport_dims.x, viewport_dims.y);
-			ViewBase::set_viewport_dims(viewport_dims.x, viewport_dims.y);
+			ViewBase::set_viewport_dims(viewport_dims);
 		} else if (strncmp(arg, "-b", 2) == 0) {
 			Logger::log("Setting benchmark mode...\n");
 			benchmark_mode = true;
@@ -332,6 +332,7 @@ int main(int argc, char **argv) {
 	}
 
 	//printf("Raycaster data size: %i B\n", sizeof(Raycaster));
+	Logger::log("Entering main event loop...\n");
 	UI::print_usage();
 	UI::start();
 	return EXIT_FAILURE;
