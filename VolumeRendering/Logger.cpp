@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdarg.h>
+#include <time.h>
 
 #include "Logger.h"
 
@@ -23,6 +24,15 @@ void Logger::init(char *log_file_name, char mode) {
 	else {
 		printf("Logging intialized: %s\n", log_file_name);
 	}
+
+	char date_string[80];
+	time_t t;
+	t = time(NULL);
+	strftime(date_string, sizeof(date_string) - 1, "%a %b %d %Y %H:%M:%S", localtime(&t));
+
+	log("==========================================================================\n");
+	log("VolR - Volume rendering engine using CUDA, by Miroslav Beno, STU FIIT 2012\n");
+    log("%s \n\n", date_string);
 }
 
 void Logger::log(const char *fmt, ...) {

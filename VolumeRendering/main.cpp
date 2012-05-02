@@ -180,48 +180,88 @@ void cuda_init() {
 	cuda_safe_call(cudaGLSetGLDevice(gpu_id));
 }
 
-void config_benchmark_loop() {
-	int draw_count[RENDERER_COUNT] = {1, 5, 5, 5, 5};
+void config_benchmark_loop(int *config) {
+	int draw_count[RENDERER_COUNT] = {1, 1, 1, 1, 1};
+	Profiler::reset_config(*config);
 	for(renderer_id = 0; renderer_id < RENDERER_COUNT; renderer_id++) {
-		ViewBase::set_camera_position(make_float3(-45,-45, 0), 3);
-		for (int k = 0; k < draw_count[renderer_id]; k++)
-			draw_volume();
-		ViewBase::set_camera_position(make_float3(0,0,0), 3);
-		for (int k = 0; k < draw_count[renderer_id]; k++)
-			draw_volume();
-		ViewBase::set_camera_position(make_float3(90,0,0), 3);
-		for (int k = 0; k < draw_count[renderer_id]; k++)
-			draw_volume();
-		ViewBase::set_camera_position(make_float3(180,90,0), 3);
-		for (int k = 0; k < draw_count[renderer_id]; k++)
-			draw_volume();
+		ViewBase::set_camera_position(make_float3(0, 0, 0));
+		for (int k = 0; k < draw_count[renderer_id]; k++) draw_volume();
+		/*ViewBase::set_camera_position(make_float3(-45, -45, 0));
+		for (int k = 0; k < draw_count[renderer_id]; k++) draw_volume();
+		ViewBase::set_camera_position(make_float3(90, 0, 0));
+		for (int k = 0; k < draw_count[renderer_id]; k++) draw_volume();
+		ViewBase::set_camera_position(make_float3(180, 90, 0));
+		for (int k = 0; k < draw_count[renderer_id]; k++) draw_volume();*/
 	}
+	Profiler::print_avg(*config);
+	Logger::log("\n");
+	*config = *config + 1;
 }
 
 void benchmark() {
 	Logger::log("Entering benchmark loop...\n");
 
-	Logger::log("Default benchmark\n");
-	config_benchmark_loop();
-	Profiler::print_config(0);
+	char benchmark_names[20][80] = {"No optims", "ERT on", "ERT+ESL on", 
+		"Scale 0.9", "Scale 0.8", "Scale 0.7", "Scale 0.6", "Scale 0.5", "Scale 0.4", "Scale 0.3",
+		"Ray step *1.1", "Ray step *1.2", "Ray step *1.3", "Ray step *1.4", "Ray step *1.5", "Ray step *1.6", "Ray step *1.7" };
 
-	Logger::log("ESL off benchmark\n");
+	int config = 0;
+
+	Logger::log("%s benchmark\n", benchmark_names[config]);
 	RaycasterBase::toggle_esl();
-	Profiler::set_config(1);
-	config_benchmark_loop();
-	Profiler::print_config(1);
-
-	Logger::log("ESL and ERT off benchmark\n");
 	RaycasterBase::change_ray_threshold(1.0f, true);
-	Profiler::set_config(2);
-	config_benchmark_loop();
-	Profiler::print_config(2);
+	config_benchmark_loop(&config);
+
+	Logger::log("%s benchmark\n", benchmark_names[config]);
+	RaycasterBase::change_ray_threshold(0.95f, true);
+	config_benchmark_loop(&config);
+
+	Logger::log("%s benchmark\n", benchmark_names[config]);
+	RaycasterBase::toggle_esl();
+	config_benchmark_loop(&config);
+
+	float viewport_scale = 1.0f;
+	ushort2 original_size = {ViewBase::view.dims.x, ViewBase::view.dims.y};
+	while (viewport_scale > 0.3f) {
+		Logger::log("%s benchmark\n", benchmark_names[config]);
+		viewport_scale -= 0.1f;
+		ViewBase::set_viewport_dims(original_size, viewport_scale);
+		UI::viewport_resized_flag = true;
+		Logger::log("Resolution: %dx%d\n", ViewBase::view.dims.x, ViewBase::view.dims.y);
+		config_benchmark_loop(&config);
+	}
+	ViewBase::set_viewport_dims(original_size);
+	UI::viewport_resized_flag = true;
+
+	float original_raystep = RaycasterBase::raycaster.ray_step;
+	float raystep_factor = 1.0;
+	while (raystep_factor <= 1.7f) {
+		Logger::log("%s benchmark\n", benchmark_names[config]);
+		raystep_factor += 0.1f;
+		RaycasterBase::change_ray_step(original_raystep * raystep_factor, true);
+		config_benchmark_loop(&config);
+	}
+	RaycasterBase::reset_ray_step();
+
+	Logger::log("\nBenchmark summary results:\n");
+	for(int r = 0; r < RENDERER_COUNT; r++)
+		Logger::log(" Rend.%2i: %s\n", r, renderers[r]->get_name());
+	Logger::log("%15s,%8s,", "Configuration", "Value");
+	for(int r = 0; r < RENDERER_COUNT; r++) {
+		//Logger::log("%8s", renderers[r]->get_name());
+		Logger::log(" Rend.%2i", r);
+		if (r != RENDERER_COUNT - 1)
+			Logger::log(",");
+	}
+	Logger::log("\n");
+	for (int i=0; i<config; i++) {
+		Logger::log("%15s,", benchmark_names[i]);
+		Profiler::print_avg(i);
+	}
 }
 
 void cleanup_and_exit() {
-	Logger::log("\nSummary profiler report:\n");
-	Profiler::print_config(0);
-	Logger::log("Cleaning...\n");
+	Logger::log("\nCleaning...\n");
 	delete_PBO_texture();
 	Profiler::destroy();
 	for (int i = RENDERER_COUNT - 1; i >=0 ; i--)
@@ -231,7 +271,7 @@ void cleanup_and_exit() {
 	free(RaycasterBase::raycaster.esl_min_max);
 	free(RaycasterBase::raycaster.esl_volume);
 	UI::destroy();
-	Logger::log("Bye!\n");
+	Logger::log("Bye!\n\n");
 	Logger::close();
 	exit(EXIT_SUCCESS);
 }
@@ -255,7 +295,7 @@ int main(int argc, char **argv) {
 		return(EXIT_SUCCESS);
 	}
 
-	Logger::init("VolR.log", 'w');
+	Logger::init("VolR.log", 'a');
 
 	bool benchmark_mode = false;
 	char file_name[256];

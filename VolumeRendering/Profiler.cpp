@@ -3,8 +3,7 @@
 #include "cuda_utils.h"
 #include "Profiler.h"
 
-float Profiler::data[MAX_CONFIG_COUNT][RENDERER_COUNT][MAX_SAMPLE_COUNT];
-int Profiler::counters[MAX_CONFIG_COUNT][RENDERER_COUNT];
+Stat Profiler::statistics[MAX_CONFIG_COUNT][RENDERER_COUNT];
 int Profiler::current_config, Profiler::current_renderer, Profiler::current_method;
 float Profiler::time_ms;
 float Profiler::last_times[LAST_SAMPLE_COUNT];
@@ -14,7 +13,15 @@ static clock_t last_clock;
 static cudaEvent_t start_event, stop_event;
 
 void Profiler::init() {
-	reset();
+	for (int c = 0; c < MAX_CONFIG_COUNT; c++) {
+		for (int r = 0; r < RENDERER_COUNT; r++)
+			statistics[c][r] = Stat();
+		reset_config(c);
+	}
+	current_config = 0;
+	for (int i = 0; i < LAST_SAMPLE_COUNT; i++)
+		last_times[i] = 0;
+	last_times_counter = 0;
 	cuda_safe_call(cudaEventCreate(&start_event));
 	cuda_safe_call(cudaEventCreate(&stop_event));
 }
@@ -24,19 +31,11 @@ void Profiler::destroy() {
 	cuda_safe_call(cudaEventDestroy(stop_event));
 }
 
-void Profiler::reset() {
-	for (int c = 0; c < MAX_CONFIG_COUNT; c++)
-		for (int r = 0; r < RENDERER_COUNT; r++)
-			counters[c][r] = 0;
+void Profiler::reset_config(int config) {
+	for (int r = 0; r < RENDERER_COUNT; r++)
+		statistics[config][r].time_sum = statistics[config][r].time_max = statistics[config][r].samples = 0;
 	current_renderer = current_method = -1;
-	current_config = 0;
 	time_ms = -1;
-	for (int i = 0; i < LAST_SAMPLE_COUNT; i++)
-		last_times[i] = 0;
-	last_times_counter = 0;
-}
-
-void Profiler::set_config(int config) {
 	current_config = CLAMP(config, 0, MAX_CONFIG_COUNT);
 }
 
@@ -63,46 +62,46 @@ float Profiler::stop() {
 		cuda_safe_call(cudaEventElapsedTime(&time_ms, start_event, stop_event));
 	}
 	// update measurements
-	int sample = counters[current_config][current_renderer];
-	if (sample < MAX_SAMPLE_COUNT) {
-		data[current_config][current_renderer][sample] = time_ms;
-		counters[current_config][current_renderer]++;
-	}
-	// reset profiler control data
-	//current_renderer = current_method = -1;
+	statistics[current_config][current_renderer].samples++;
+	statistics[current_config][current_renderer].time_sum += time_ms;
+	if (time_ms > statistics[current_config][current_renderer].time_max)
+		statistics[current_config][current_renderer].time_max = time_ms;
 	last_times[last_times_counter] = time_ms;
 	last_times_counter = ++last_times_counter % LAST_SAMPLE_COUNT;
+	// reset profiler control data
+	current_renderer = current_method = -1;
 	return time_ms;
 }
 
-float Profiler::average(int config, int renderer) {
-	int counter = counters[config][renderer];
-	if (counter == 0) 
-		return -1;
-	float sum = 0;
-	for (int sample = 0; sample < counter; sample++)
-		sum += data[config][renderer][sample];
-	return sum / counter;
-}
-
-float Profiler::maximum(int config, int renderer) {
-	int counter = counters[config][renderer];
-	float max_value = -1;
-	for (int sample = 0; sample < counter; sample++)
-		if (data[config][renderer][sample] > max_value)
-			max_value = data[config][renderer][sample];
-	return max_value;
-}
-
-void Profiler::print_config(int config) {
-	Logger::log("Renderer ID, Samples, Max (ms), Avg (ms)");
-	Logger::log("\n");
+void Profiler::print_samples(int config) {
+	Logger::log("%9s", "Samples,");
 	for (int r = 0; r < RENDERER_COUNT; r++) {
-		Logger::log("%11i, ", r);
-		Logger::log("%7i, ", counters[config][r]);
-		Logger::log("%8.2f, ", maximum(config, r));
-		Logger::log("%8.2f", average(config, r));
-		Logger::log("\n");
+		Logger::log("%8i", statistics[config][r].samples);
+		if (r != RENDERER_COUNT - 1)
+			Logger::log(",");
+	}
+	Logger::log("\n");
+}
+
+void Profiler::print_avg(int config) {
+	Logger::log("%9s", "Avg(ms),");
+	for (int r = 0; r < RENDERER_COUNT; r++) {
+		if (statistics[config][r].samples != 0)
+			Logger::log("%8.2f", statistics[config][r].time_sum / statistics[config][r].samples);
+		else
+			Logger::log("%8s", "N/A");
+		if (r != RENDERER_COUNT - 1)
+			Logger::log(",");
+	}
+	Logger::log("\n");
+}
+
+void Profiler::print_max(int config) {
+	Logger::log("%9s", "Max(ms),");
+	for (int r = 0; r < RENDERER_COUNT; r++) {
+		Logger::log("%8.2f", statistics[config][r].time_max);
+		if (r != RENDERER_COUNT - 1)
+			Logger::log(",");
 	}
 	Logger::log("\n");
 }

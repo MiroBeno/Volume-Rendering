@@ -40,7 +40,7 @@ class ViewBase {
 		static void camera_rotate(int2 pixels);
 		static void camera_zoom(float distance);
 		static void camera_zoom(int pixels);
-		static void set_camera_position(float3 angles, float distance);
+		static void set_camera_position(float3 angles, float distance = 3.0f);
 		static void light_rotate(int2 pixels);
 		static void toggle_perspective(int update_mode);
 		static void set_viewport_dims(ushort2 dims, float scale = 1.0f);

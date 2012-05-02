@@ -186,10 +186,10 @@ void keyboard_callback(unsigned char key, int x, int y) {
 		case '2': set_renderer_callback(2); break;
 		case '3': set_renderer_callback(3); break;
 		case '4': set_renderer_callback(4); break;
-		case '7': ViewBase::set_camera_position(make_float3(-45,-45, 0), 3); break;
-		case '8': ViewBase::set_camera_position(make_float3(0,0,0), 3); break;
-		case '9': ViewBase::set_camera_position(make_float3(90,0,0), 3); break;
-		case '0': ViewBase::set_camera_position(make_float3(180,90,0), 3); break;
+		case '7': ViewBase::set_camera_position(make_float3(-45, -45, 0)); break;
+		case '8': ViewBase::set_camera_position(make_float3(0, 0, 0)); break;
+		case '9': ViewBase::set_camera_position(make_float3(90, 0, 0)); break;
+		case '0': ViewBase::set_camera_position(make_float3(180, 90, 0)); break;
 		case 'r': UI::toggle_auto_rotate(false); break;
 		case 'c': UI::toggle_glui_panel(false); break;
 		case 't': UI::toggle_tf_editor(false); break;
