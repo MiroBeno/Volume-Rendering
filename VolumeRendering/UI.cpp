@@ -27,6 +27,7 @@ static int2 pre_fullscreen_size;
 static float bg_color = 0.25f;
 static float viewport_scale = 1.0f;
 static short4 mouse_state = {0, 0, GLUT_LEFT_BUTTON, GLUT_UP};
+static int mouse_right_drag_function = -1;
 static int2 auto_rotate = {0, 0};
 static int last_zoom_value = 0;
 static float4 profiler_pos = {0.7, 0.92, 0.98, 0.98};
@@ -225,6 +226,9 @@ void mouse_callback(int button, int state, int x, int y) {
 				auto_rotate = make_int2(0, 0);
 		}
 	}
+	if (button == GLUT_RIGHT_BUTTON) {
+		mouse_right_drag_function = -1;
+	}
 }
 
 void motion_callback(int x, int y) {
@@ -233,9 +237,13 @@ void motion_callback(int x, int y) {
 		auto_rotate.y = y - mouse_state.y;
 		ViewBase::camera_rotate(auto_rotate); 
 	}
-	if (mouse_state.z == GLUT_RIGHT_BUTTON) {	  
-		ViewBase::camera_rotate(make_int3(0, 0, x - mouse_state.x)); 
-		ViewBase::camera_zoom(y - mouse_state.y); 
+	if (mouse_state.z == GLUT_RIGHT_BUTTON) {
+		if (mouse_right_drag_function == -1) 
+			mouse_right_drag_function = (abs(x - mouse_state.x) > abs(y - mouse_state.y));
+		if (mouse_right_drag_function)
+			ViewBase::camera_rotate(make_int3(0, 0, x - mouse_state.x)); 
+		else
+			ViewBase::camera_zoom(y - mouse_state.y); 
 	}
 	if (mouse_state.z == GLUT_MIDDLE_BUTTON) {	  
 		ViewBase::light_rotate(make_int2(x - mouse_state.x, y - mouse_state.y));
