@@ -25,6 +25,8 @@ inline static void render_ray(Raycaster raycaster, uchar4 buffer[], short2 pos) 
 	while (k_range.x <= k_range.y) {
 		unsigned char sample = raycaster.volume.sample_data(pt);
 		float4 color_cur = raycaster.transfer_fn[sample / TF_RATIO];
+		if (color_cur.w > 0.05f && raycaster.light_kd > 0.01f)
+			raycaster.shade(&color_cur, pt, sample);
 		color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
 		if (color_acc.w > raycaster.ray_threshold) 
 			break;

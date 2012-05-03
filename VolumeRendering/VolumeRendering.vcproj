@@ -36,8 +36,8 @@
 			<Tool
 				Name="Cudart Build Rule"
 				NvccCompilation="0"
-				Arch1="12"
-				Arch2="0"
+				Arch1="10"
+				Arch2="20"
 				TargetMachinePlatform="0"
 				MaxRegCount="32"
 				PtxAsOptionV="true"

@@ -40,6 +40,7 @@ static __global__ void render_ray(uchar4 dev_buffer[]) {
 	while (k_range.x <= k_range.y) {
 		unsigned char sample = raycaster.volume.sample_data(pt);
 		float4 color_cur = transfer_fn[sample / TF_RATIO];
+		raycaster.shade(&color_cur, pt, sample);
 		color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
 		if (color_acc.w > raycaster.ray_threshold) 
 			break;

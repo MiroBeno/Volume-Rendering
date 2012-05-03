@@ -98,11 +98,13 @@ struct Raycaster {
 		k->x += dk;
 	}
 
-	__host__ __device__ void shade(float4 *color, float3 pos, unsigned char sample) {
-		if (color->w < 0.1f) 
-			return;
+	__forceinline __host__ __device__ void shade(float4 *color, float3 pos, unsigned char sample) {
 		float3 light_dir = vector_normalize(view.light_pos - pos);
-		float sample_l = volume.sample_data(pos + light_dir * 0.01f) / 255.0f;
+		float sample_l; 
+		if (color->w > 0.05f && light_kd > 0.01f) 
+			sample_l = volume.sample_data(pos + light_dir * 0.01f) / 255.0f;
+		else
+			sample_l = sample / 255.0f;
 		float diffuse_light = (sample_l - sample / 255.0f) * light_kd;
 		color->x += diffuse_light;
 		color->y += diffuse_light;

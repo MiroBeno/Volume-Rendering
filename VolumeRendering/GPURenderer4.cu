@@ -4,8 +4,7 @@
 #include "Renderer.h"
 
 static __constant__ Raycaster raycaster;
-static __constant__ float4 transfer_fn[TF_SIZE];
-//static __constant__ esl_type esl_volume[ESL_VOLUME_SIZE];
+//static __constant__ float4 transfer_fn[TF_SIZE];
 
 cudaArray *volume_array = 0;
 texture<unsigned char, 3, cudaReadModeNormalizedFloat> volume_texture;
@@ -27,15 +26,6 @@ GPURenderer4::~GPURenderer4() {
 	cuda_safe_call(cudaFreeArray(transfer_fn_array));
 	cuda_safe_call(cudaUnbindTexture(esl_texture));
 	cuda_safe_call(cudaFreeArray(esl_array));
-}
-
-__device__ float4 sample_texture_interpolated(float sample) {
-	float index = sample * (TF_SIZE-1);
-	float floor_index = floor(index);
-	float ceil_index = ceil(index);
-	return floor_index != ceil_index
-					? transfer_fn[(int) floor_index] * (ceil_index - index) + transfer_fn[(int) ceil_index] * (index - floor_index)
-					: transfer_fn[(int) index];
 }
 
 __device__  bool sample_data_esl_texture(float3 pos) {
@@ -86,7 +76,7 @@ static __global__ void render_ray(uchar4 dev_buffer[]) {
 	while (k_range.x <= k_range.y) {
 		float sample = tex3D(volume_texture, (pt.x + 1)*0.5f, (pt.y + 1)*0.5f, (pt.z + 1)*0.5f);
 		float4 color_cur = tex1D(transfer_fn_texture, sample);
-		//float4 color = transfer_fn[int(sample*(TF_SIZE-1))];
+		//float4 color_cur = transfer_fn[int(sample*(TF_SIZE-1))];
 		shade_texture(&color_cur, pt, sample);
 		color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
 		if (color_acc.w > raycaster.ray_threshold) 
@@ -108,7 +98,7 @@ void GPURenderer4::set_transfer_fn(Raycaster r) {
 		cuda_safe_call(cudaBindTextureToArray(transfer_fn_texture, transfer_fn_array, channel_desc));
 	}
 	cuda_safe_call(cudaMemcpyToArray(transfer_fn_array, 0, 0, r.transfer_fn, TF_SIZE * sizeof(float4), cudaMemcpyHostToDevice));
-	/**/cuda_safe_call(cudaMemcpyToSymbol(transfer_fn, r.transfer_fn, TF_SIZE * sizeof(float4)));
+	//cuda_safe_call(cudaMemcpyToSymbol(transfer_fn, r.transfer_fn, TF_SIZE * sizeof(float4)));
 
 	if (esl_array == 0) {
 		cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<esl_type>();	
@@ -121,7 +111,6 @@ void GPURenderer4::set_transfer_fn(Raycaster r) {
 		cuda_safe_call(cudaBindTextureToArray(esl_texture, esl_array, channel_desc));
 	}
 	cuda_safe_call(cudaMemcpyToArray(esl_array, 0, 0, r.esl_volume, ESL_VOLUME_SIZE * sizeof(esl_type), cudaMemcpyHostToDevice));
-	//cuda_safe_call(cudaMemcpyToSymbol(esl_volume, r.esl_volume, ESL_VOLUME_SIZE * sizeof(esl_type)));
 }
 
 void GPURenderer4::set_volume(Model volume) {

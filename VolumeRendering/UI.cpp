@@ -22,7 +22,7 @@ static GLUI_FileBrowser *file_browser;
 static int main_window_id, tf_editor_id;
 static int fullscreen = false, profiler_graph_visible = false,  glui_panel_visible = true,
 			tf_editor_visible = true, tfe_histogram_visible = true, tfe_color_picker_visible = false;
-static float3 tf_editor_color = {0, 1, 0};
+static float3 tf_editor_color = {-1, -1, -1};
 static int2 pre_fullscreen_size;
 static float bg_color = 0.25f;
 static float viewport_scale = 1.0f;
@@ -110,10 +110,10 @@ void draw_main_texture() {
 
 void display_callback(void) {
 	//printf("Main window display callback...\n");
-	/**/float frame = 0; //Profiler::stop();
+	//float frame = Profiler::stop();
 	UI::draw_function();
-	sprintf(text_buffer, "%s %s @ %.2f ms / %.2f ms (%dx%d)", UI::app_name, UI::renderers[*UI::renderer_id]->get_name(), 
-		Profiler::time_ms, frame, ViewBase::view.dims.x, ViewBase::view.dims.y);
+	sprintf(text_buffer, "%s %s @ %.2f ms (%dx%d)", UI::app_name, UI::renderers[*UI::renderer_id]->get_name(), 
+		Profiler::time_ms, ViewBase::view.dims.x, ViewBase::view.dims.y);
 	glutSetWindowTitle(text_buffer);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glEnable(GL_BLEND);
@@ -316,6 +316,8 @@ void display_tfe_callback(void) {
 
 void motion_tfe_callback(int x, int y) {
 	if (mouse_state.z == GLUT_MIDDLE_BUTTON || tfe_color_picker_visible)
+		return;
+	if (mouse_state.z == GLUT_RIGHT_BUTTON && tf_editor_color.x == -1)
 		return;
 	float win_width = (float)glutGet(GLUT_WINDOW_WIDTH), win_height = (float)glutGet(GLUT_WINDOW_HEIGHT);
 	int steps = abs(x - mouse_state.x);
