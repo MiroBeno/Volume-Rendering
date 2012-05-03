@@ -86,7 +86,7 @@ void Profiler::print_samples(int config) {
 void Profiler::print_avg(int config) {
 	Logger::log("%9s", "Avg(ms),");
 	for (int r = 0; r < RENDERER_COUNT; r++) {
-		if (statistics[config][r].samples != 0)
+		if (statistics[config][r].samples >= MIN_SAMPLE_STAT)
 			Logger::log("%8.2f", statistics[config][r].time_sum / statistics[config][r].samples);
 		else
 			Logger::log("%8s", "N/A");
@@ -99,7 +99,10 @@ void Profiler::print_avg(int config) {
 void Profiler::print_max(int config) {
 	Logger::log("%9s", "Max(ms),");
 	for (int r = 0; r < RENDERER_COUNT; r++) {
-		Logger::log("%8.2f", statistics[config][r].time_max);
+		if (statistics[config][r].samples >= MIN_SAMPLE_STAT)
+			Logger::log("%8.2f", statistics[config][r].time_max);
+		else
+			Logger::log("%8s", "N/A");
 		if (r != RENDERER_COUNT - 1)
 			Logger::log(",");
 	}

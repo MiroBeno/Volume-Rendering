@@ -5,6 +5,7 @@
 
 #define MAX_CONFIG_COUNT 100
 #define LAST_SAMPLE_COUNT 300
+#define MIN_SAMPLE_STAT 8
 
 struct Stat {
 	unsigned int samples;

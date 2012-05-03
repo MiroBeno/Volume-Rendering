@@ -74,7 +74,7 @@ void RaycasterBase::reset_transfer_fn() {
 		RaycasterBase::base_transfer_fn[i] = make_float4(i <= TF_SIZE/3 ? (i*3)/(float)(TF_SIZE) : 0.0f, 
 										(i > TF_SIZE/3) && (i <= TF_SIZE/3*2) ? ((i-TF_SIZE/3)*3)/(float)(TF_SIZE) : 0.0f, 
 										i > TF_SIZE/3*2 ? ((i-TF_SIZE/3*2)*3)/(float)(TF_SIZE) : 0.0f, 
-										i > (20/TF_RATIO) ? i/(float)(TF_SIZE) : 0.0f);
+										i > ((255.0f * 0.1f)/TF_RATIO) ? i/(float)(TF_SIZE) : 0.0f);
 	}
 	//RaycasterBase::base_transfer_fn[30] = make_float4(1,1,1,1);
 	/*for (int i =0; i < TF_SIZE; i++) {

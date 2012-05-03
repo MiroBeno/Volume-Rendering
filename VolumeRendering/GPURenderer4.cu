@@ -37,8 +37,6 @@ __device__  bool sample_data_esl_texture(float3 pos) {
 }
 
 __device__ void shade_texture(float4 *color, float3 pos, float sample) {
-		if (color->w < 0.05f || raycaster.light_kd < 0.01f) 
-			return;
 		float3 light_dir = vector_normalize(raycaster.view.light_pos - pos);
 		float sample_l = tex3D(volume_texture, 
 			(pos.x + light_dir.x * 0.01f + 1)*0.5f,
@@ -77,7 +75,8 @@ static __global__ void render_ray(uchar4 dev_buffer[]) {
 		float sample = tex3D(volume_texture, (pt.x + 1)*0.5f, (pt.y + 1)*0.5f, (pt.z + 1)*0.5f);
 		float4 color_cur = tex1D(transfer_fn_texture, sample);
 		//float4 color_cur = transfer_fn[int(sample*(TF_SIZE-1))];
-		shade_texture(&color_cur, pt, sample);
+		if (color_cur.w > 0.05f && raycaster.light_kd > 0.01f)
+			shade_texture(&color_cur, pt, sample);
 		color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
 		if (color_acc.w > raycaster.ray_threshold) 
 			break;

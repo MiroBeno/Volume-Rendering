@@ -15,12 +15,17 @@
 #include "common.h"
 #include "cuda_utils.h"
 
+#define MAX_BENCH_SAMPLE 7500
+
 static char file_name[100] = "VisMale.pvm";	
 static char log_file[100] = "volr_report.log";
 bool NO_SAFE = false;
 
 static int config = 0;
-static char config_names[50][80] = {"Interactive", "No optims", "ERT on", "ERT+ESL on", 
+static char config_names[50][80] = {"Interactive", 
+		"Bucky", "Daisy", "VisMale", "Engine", "Foot", "Pig", "Porsche",
+		"Pig: No optims", "P: ERT on", "P: ERT+ESL on",
+		"Foot: No optims", "F: ERT on", "F: ERT+ESL on", 
 		"Scale 0.9", "Scale 0.8", "Scale 0.7", "Scale 0.6", "Scale 0.5", "Scale 0.4", "Scale 0.3",
 		"Ray step *1.1", "Ray step *1.2", "Ray step *1.3", "Ray step *1.4", "Ray step *1.5", "Ray step *1.6", "Ray step *1.7" };
 
@@ -198,45 +203,90 @@ void print_profiler() {
 	}
 	Logger::log("\n");
 	for (int i=0; i<=config; i++) {
+		if (i == 0) {
+			Logger::log("%15s,", config_names[i]);
+			Profiler::print_samples(i);
+		}
 		Logger::log("%15s,", config_names[i]);
 		Profiler::print_avg(i);
+		if (i <= 7) {
+			Logger::log("%15s,", config_names[i]);
+			Profiler::print_max(i);
+		}
 	}
 }
 
-void config_benchmark_loop() {
-	static const int draw_count[RENDERER_COUNT] = {0, 1, 1, 1, 1};
-	Profiler::reset_config(config);
+void benchmark_config_loop() {
+	Profiler::reset_config(config);	
 	for(renderer_id = 0; renderer_id < RENDERER_COUNT; renderer_id++) {
-		ViewBase::set_camera_position(make_float3(0, 0, 0));
-		for (int k = 0; k < draw_count[renderer_id]; k++) draw_volume();
-		ViewBase::set_camera_position(make_float3(-45, -45, 0));
-		for (int k = 0; k < draw_count[renderer_id]; k++) draw_volume();
-		ViewBase::set_camera_position(make_float3(90, 0, 0));
-		for (int k = 0; k < draw_count[renderer_id]; k++) draw_volume();
-		ViewBase::set_camera_position(make_float3(180, 90, 0));
-		for (int k = 0; k < draw_count[renderer_id]; k++) draw_volume();
+		if (renderer_id == 0 && config > 6 && config < 14)
+			continue;
+		ViewBase::view.perspective = false;
+		for (int p = 0; p<2; p++) {
+			ViewBase::toggle_perspective(true);
+			ViewBase::set_camera_position(make_float3(0, 0, 0), 2);
+			draw_volume();
+			if (Profiler::time_ms > MAX_BENCH_SAMPLE) break;
+			ViewBase::set_camera_position(make_float3(-45, -45, 0), 2);
+			draw_volume();
+			if (Profiler::time_ms > MAX_BENCH_SAMPLE) break;
+			ViewBase::set_camera_position(make_float3(90, 0, 0), 2);
+			draw_volume();
+			if (Profiler::time_ms > MAX_BENCH_SAMPLE) break;
+			ViewBase::set_camera_position(make_float3(180, 90, 0), 2);
+			draw_volume();
+			if (Profiler::time_ms > MAX_BENCH_SAMPLE) break;
+			ViewBase::view.perspective = true;
+		}
 	}
 	Profiler::print_avg(config);
 	config++;
 	Logger::log("\n");
 }
 
+int benchmark_load_file(const char* file_name) {
+	char name[256] = "";
+	sprintf(name, "%s.pvm", file_name);
+	int file_loaded = ModelBase::load_model(name);
+	if (file_loaded == 0) {
+		RaycasterBase::set_volume(ModelBase::volume);
+		for (int i=0; i < RENDERER_COUNT; i++) {
+			UI::renderers[i]->set_volume(RaycasterBase::raycaster.volume);
+			UI::renderers[i]->set_transfer_fn(RaycasterBase::raycaster);
+		}
+	}
+	return file_loaded;
+}
+
 void benchmark() {
 	Logger::log("Entering benchmark loop...\n\n");
 	config = 1;
 
-	Logger::log("%s benchmark\n", config_names[config]);
-	RaycasterBase::toggle_esl();
-	RaycasterBase::change_ray_threshold(1.0f, true);
-	config_benchmark_loop();
+	while (config <= 7) {
+		Logger::log("%s benchmark\n", config_names[config]);
+		if (benchmark_load_file(config_names[config]) != 0) {
+			config++;
+			continue;
+			}
+		benchmark_config_loop();
+	}
 
-	Logger::log("%s benchmark\n", config_names[config]);
-	RaycasterBase::change_ray_threshold(0.95f, true);
-	config_benchmark_loop();
+	benchmark_load_file("Pig");
+	for (int i = 0; i<2; i++) {
+		Logger::log("%s benchmark\n", config_names[config]);
+		RaycasterBase::toggle_esl();
+		RaycasterBase::change_ray_threshold(1.0f, true);
+		benchmark_config_loop();
 
-	Logger::log("%s benchmark\n", config_names[config]);
-	RaycasterBase::toggle_esl();
-	config_benchmark_loop();
+		Logger::log("%s benchmark\n", config_names[config]);
+		RaycasterBase::change_ray_threshold(0.95f, true);
+		benchmark_config_loop();
+
+		Logger::log("%s benchmark\n", config_names[config]);
+		RaycasterBase::toggle_esl();
+		benchmark_config_loop();
+		benchmark_load_file("Foot");
+	}
 
 	float viewport_scale = 1.0f;
 	ushort2 original_size = {ViewBase::view.dims.x, ViewBase::view.dims.y};
@@ -246,7 +296,7 @@ void benchmark() {
 		ViewBase::set_viewport_dims(original_size, viewport_scale);
 		UI::viewport_resized_flag = true;
 		Logger::log("Resolution: %dx%d\n", ViewBase::view.dims.x, ViewBase::view.dims.y);
-		config_benchmark_loop();
+		benchmark_config_loop();
 	}
 	ViewBase::set_viewport_dims(original_size);
 	UI::viewport_resized_flag = true;
@@ -257,7 +307,7 @@ void benchmark() {
 		Logger::log("%s benchmark\n", config_names[config]);
 		raystep_factor += 0.1f;
 		RaycasterBase::change_ray_step(original_raystep * raystep_factor, true);
-		config_benchmark_loop();
+		benchmark_config_loop();
 	}
 	RaycasterBase::reset_ray_step();
 	config--;
@@ -374,7 +424,7 @@ int main(int argc, char **argv) {
 		cleanup_and_exit();
 	}
 
-	ViewBase::set_camera_position(make_float3(90, 0, 180));
+	ViewBase::set_camera_position(make_float3(120, 0, 200));
 
 	//printf("Raycaster data size: %i B\n", sizeof(Raycaster));
 	Logger::log("Entering main event loop...\n");
