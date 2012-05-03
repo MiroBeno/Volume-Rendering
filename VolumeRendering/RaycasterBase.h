@@ -26,7 +26,7 @@ struct Raycaster {
 	float3 esl_block_size;
 	float light_kd;
 
-	__host__ __device__ bool intersect(float3 pt, float3 dir, float2 *k) {  // mozne odchylky pri vypocte => hodnoty k mimo volume; riesi sa clampovanim vysledku na stenu
+	__forceinline __host__ __device__ bool intersect(float3 pt, float3 dir, float2 *k) {  // mozne odchylky pri vypocte => hodnoty k mimo volume; riesi sa clampovanim vysledku na stenu
 		if (dir.x == 0) dir.x = 0.00001f;					// neosetrene NaN pri 0/0
 		if (dir.y == 0) dir.y = 0.00001f;
 		if (dir.z == 0) dir.z = 0.00001f;	
@@ -38,7 +38,7 @@ struct Raycaster {
 		return ((k->x < k->y) && (k->y > 0));				// nenulovy interval koeficientu k (existuje priesecnica) A vystupny bod lezi na luci	 
 	}	
 
-	__host__ __device__ void write_color(float4 color, short2 pos, uchar4 buffer[]) {
+	__forceinline __host__ __device__ void write_color(float4 color, short2 pos, uchar4 buffer[]) {
 		buffer[pos.y * view.dims.x + pos.x] = 
 			make_uchar4( map_float_int(color.x, 256), 
 						map_float_int(color.y, 256), 

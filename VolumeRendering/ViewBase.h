@@ -14,7 +14,7 @@ struct View {
 	float3 light_pos;
 	bool perspective;
 
-	__host__ __device__ void get_ray(short2 pos, float3 *origin_vector, float3 *direction_vector) {
+	__forceinline __host__ __device__ void get_ray(short2 pos, float3 *origin_vector, float3 *direction_vector) {
 		if (perspective) {
 			*origin_vector = origin;
 			*direction_vector = direction + (right_plane * (float) (pos.x - dims.x / 2));
