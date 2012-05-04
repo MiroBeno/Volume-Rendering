@@ -409,23 +409,23 @@ void glui_callback(GLUI_Control *source) {
 		ViewBase::light_rotate(make_int2(0,0));
 	}
 	else if (source == file_browser) {
-		int file_loaded = ModelBase::load_model(file_browser->get_file());
-		if (file_loaded == 0) {
-			RaycasterBase::set_volume(ModelBase::volume);
-			for (int i=0; i < RENDERER_COUNT; i++) {
-				UI::renderers[i]->set_volume(RaycasterBase::raycaster.volume);
-				UI::renderers[i]->set_transfer_fn(RaycasterBase::raycaster);
-			}
-			float ray_step_value = RaycasterBase::raycaster.ray_step;
-			ray_step_scroll->set_float_limits(RaycasterBase::ray_step_limits.x, RaycasterBase::ray_step_limits.y);
-			ray_step_scroll->set_float_val(ray_step_value);
-			sprintf(text_buffer, "File: %s", ModelBase::file_name);
-			file_name_text->set_text(text_buffer);
-			sprintf(text_buffer, "Dimensions: %dx%dx%d", ModelBase::volume.dims.x, ModelBase::volume.dims.y, ModelBase::volume.dims.z);
-			volume_dims_text->set_text(text_buffer);
-			glutSetWindow(tf_editor_id);
-			glutPostRedisplay();
+		int file_error = ModelBase::load_model(file_browser->get_file());
+		if (file_error) 
+			return;
+		RaycasterBase::set_volume(ModelBase::volume);
+		for (int i=0; i < RENDERER_COUNT; i++) {
+			UI::renderers[i]->set_volume(RaycasterBase::raycaster.volume);
+			UI::renderers[i]->set_transfer_fn(RaycasterBase::raycaster);
 		}
+		float ray_step_value = RaycasterBase::raycaster.ray_step;
+		ray_step_scroll->set_float_limits(RaycasterBase::ray_step_limits.x, RaycasterBase::ray_step_limits.y);
+		ray_step_scroll->set_float_val(ray_step_value);
+		sprintf(text_buffer, "File: %s", ModelBase::file_name);
+		file_name_text->set_text(text_buffer);
+		sprintf(text_buffer, "Dimensions: %dx%dx%d", ModelBase::volume.dims.x, ModelBase::volume.dims.y, ModelBase::volume.dims.z);
+		volume_dims_text->set_text(text_buffer);
+		glutSetWindow(tf_editor_id);
+		glutPostRedisplay();
 	}
 	else if (source == bg_color_scroll) {
 		glutSetWindow(main_window_id);

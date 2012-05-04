@@ -63,31 +63,42 @@ static __global__ void render_ray(Raycaster raycaster, uchar4 dev_buffer[]) {
 
 void GPURenderer1::set_transfer_fn(Raycaster r) {
 	if (transfer_fn == NULL) 
-		cuda_safe_call(cudaMalloc((void **)&transfer_fn, TF_SIZE * sizeof(float4)));
+		cuda_safe_malloc(cudaMalloc((void **)&transfer_fn, TF_SIZE * sizeof(float4)));
 	if (esl_volume == NULL) 
-		cuda_safe_call(cudaMalloc((void **)&esl_volume, ESL_VOLUME_SIZE * sizeof(esl_type)));
+		cuda_safe_malloc(cudaMalloc((void **)&esl_volume, ESL_VOLUME_SIZE * sizeof(esl_type)));
 	cuda_safe_call(cudaMemcpy(transfer_fn, r.transfer_fn, TF_SIZE * sizeof(float4), cudaMemcpyHostToDevice));
 	cuda_safe_call(cudaMemcpy(esl_volume, r.esl_volume, ESL_VOLUME_SIZE * sizeof(esl_type), cudaMemcpyHostToDevice));
 }
 
 void GPURenderer1::set_window_buffer(View view) {
-	if (dev_buffer != NULL)
+	if (dev_buffer != NULL) {
 		cuda_safe_call(cudaFree(dev_buffer));
+		dev_buffer = NULL;
+	}
 	dev_buffer_size = view.dims.x * view.dims.y * 4;
-	cuda_safe_call(cudaMalloc((void **)&dev_buffer, dev_buffer_size));
+	cuda_safe_malloc(cudaMalloc((void **)&dev_buffer, dev_buffer_size));
 	num_blocks = dim3((view.dims.x + THREADS_PER_BLOCK.x - 1) / THREADS_PER_BLOCK.x, 
 					  (view.dims.y + THREADS_PER_BLOCK.y - 1) / THREADS_PER_BLOCK.y);		
 			// celociselne delenie, ak su rozmery okna nedelitelne 16, spustaju sa bloky s nevyuzitimi threadmi
 }
 
-void GPURenderer1::set_volume(Model volume) {
-	if (dev_volume_data != NULL)
+int GPURenderer1::set_volume(Model volume) {
+	if (dev_volume_data != NULL) {
 		cuda_safe_call(cudaFree(dev_volume_data));
-	cuda_safe_call(cudaMalloc((void **)&dev_volume_data, volume.size));
+		dev_volume_data = NULL;
+	}
+	if (volume.data == NULL)
+		return 1;
+	cuda_safe_malloc(cudaMalloc((void **)&dev_volume_data, volume.size)); 
+	if (cudaGetLastError() == cudaErrorMemoryAllocation)
+		return 1;
 	cuda_safe_call(cudaMemcpy(dev_volume_data, volume.data, volume.size, cudaMemcpyHostToDevice));
+	return 0;
 }
 
 int GPURenderer1::render_volume(uchar4 *buffer, Raycaster r) {
+	if (dev_volume_data == NULL || transfer_fn == NULL || esl_volume == NULL || buffer == NULL)
+		return 1;
 	r.volume.data = dev_volume_data;
 	r.transfer_fn = transfer_fn;
 	r.esl_volume = esl_volume;

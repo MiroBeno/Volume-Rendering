@@ -89,7 +89,7 @@ static __global__ void render_ray(uchar4 dev_buffer[]) {
 void GPURenderer4::set_transfer_fn(Raycaster r) {
 	if (transfer_fn_array == 0) {
 		cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<float4>();
-		cuda_safe_call(cudaMallocArray(&transfer_fn_array, &channel_desc, TF_SIZE, 1)); 
+		cuda_safe_malloc(cudaMallocArray(&transfer_fn_array, &channel_desc, TF_SIZE, 1)); 
 
 		transfer_fn_texture.filterMode = cudaFilterModeLinear; 
 		transfer_fn_texture.normalized = true;
@@ -101,7 +101,7 @@ void GPURenderer4::set_transfer_fn(Raycaster r) {
 
 	if (esl_array == 0) {
 		cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<esl_type>();	
-		cuda_safe_call(cudaMallocArray(&esl_array, &channel_desc, ESL_VOLUME_DIMS, ESL_VOLUME_DIMS));
+		cuda_safe_malloc(cudaMallocArray(&esl_array, &channel_desc, ESL_VOLUME_DIMS, ESL_VOLUME_DIMS));
 
 		esl_texture.normalized = false;
 		esl_texture.filterMode = cudaFilterModePoint;  
@@ -112,14 +112,19 @@ void GPURenderer4::set_transfer_fn(Raycaster r) {
 	cuda_safe_call(cudaMemcpyToArray(esl_array, 0, 0, r.esl_volume, ESL_VOLUME_SIZE * sizeof(esl_type), cudaMemcpyHostToDevice));
 }
 
-void GPURenderer4::set_volume(Model volume) {
-	if (volume_array == 0) {
+int GPURenderer4::set_volume(Model volume) {
+	if (volume_array != 0) {
 		cuda_safe_call(cudaUnbindTexture(volume_texture));
 		cuda_safe_call(cudaFreeArray(volume_array));
+		volume_array = 0;
 	}
+	if (volume.data == NULL)
+		return 1;
 	cudaExtent volume_dims = {volume.dims.x, volume.dims.y, volume.dims.z};	
 	cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<unsigned char>();	
-	cuda_safe_call(cudaMalloc3DArray(&volume_array, &channel_desc, volume_dims));
+	cuda_safe_malloc(cudaMalloc3DArray(&volume_array, &channel_desc, volume_dims));
+	if (cudaGetLastError() == cudaErrorMemoryAllocation)
+		return 1;
 
     cudaMemcpy3DParms copyParams = {0};
 	copyParams.srcPtr   = make_cudaPitchedPtr(volume.data, volume_dims.width*sizeof(unsigned char), volume_dims.width, volume_dims.height);
@@ -134,9 +139,12 @@ void GPURenderer4::set_volume(Model volume) {
     volume_texture.addressMode[1] = cudaAddressModeClamp;
     volume_texture.addressMode[2] = cudaAddressModeClamp;
     cuda_safe_call(cudaBindTextureToArray(volume_texture, volume_array, channel_desc));
+	return 0;
 }
 
 int GPURenderer4::render_volume(uchar4 *buffer, Raycaster r) {
+	if (volume_array == 0 || transfer_fn_array == 0 || esl_array == 0 || buffer == NULL)
+		return 1;
 	cuda_safe_call(cudaMemset(buffer, 0, dev_buffer_size));
 	cuda_safe_call(cudaMemcpyToSymbol(raycaster, &r, sizeof(Raycaster)));
 	render_ray<<<num_blocks, THREADS_PER_BLOCK>>>(buffer);

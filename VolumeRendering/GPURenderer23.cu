@@ -56,6 +56,8 @@ void GPURenderer2::set_transfer_fn(Raycaster r) {
 }
 
 int GPURenderer2::render_volume(uchar4 *buffer, Raycaster r) {
+	if (dev_volume_data == NULL || buffer == NULL)
+		return 1;
 	r.volume.data = dev_volume_data;
 	cuda_safe_call(cudaMemset(dev_buffer, 0, dev_buffer_size));
 	cuda_safe_call(cudaMemcpyToSymbol(raycaster, &r, sizeof(Raycaster)));
@@ -66,6 +68,8 @@ int GPURenderer2::render_volume(uchar4 *buffer, Raycaster r) {
 }
 
 int GPURenderer3::render_volume(uchar4 *buffer, Raycaster r) {
+	if (dev_volume_data == NULL || buffer == NULL)
+		return 1;
 	r.volume.data = dev_volume_data;
 	cuda_safe_call(cudaMemset(buffer, 0, dev_buffer_size));
 	cuda_safe_call(cudaMemcpyToSymbol(raycaster, &r, sizeof(Raycaster)));

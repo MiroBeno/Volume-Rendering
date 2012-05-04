@@ -37,6 +37,9 @@ inline static void render_ray(Raycaster raycaster, uchar4 buffer[], short2 pos) 
 }
 
 int CPURenderer::render_volume(uchar4 *buffer, Raycaster r) {
+	if (r.volume.data == NULL || r.transfer_fn == NULL || r.esl_volume == NULL || buffer == NULL)
+		return 1;
+
 	memset(buffer, 0, r.view.dims.x * r.view.dims.y * 4);
 	for(int row = 0; row < r.view.dims.y; row++)
 		for(int col = 0; col < r.view.dims.x; col++)	{

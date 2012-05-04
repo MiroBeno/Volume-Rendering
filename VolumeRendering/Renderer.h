@@ -17,7 +17,8 @@ class Renderer {
 			};
 		virtual void set_transfer_fn(Raycaster r) {
 			};
-		virtual void set_volume(Model volume) {
+		virtual int set_volume(Model volume) {
+			return 0;
 			};
 		virtual int render_volume(uchar4 *buffer, Raycaster r) = 0;
 };
@@ -45,7 +46,7 @@ class GPURenderer1: public GPURenderer {
 		virtual const char *get_name() { return "CUDA Straightforward"; }
 		virtual void set_window_buffer(View view);
 		virtual void set_transfer_fn(Raycaster r);
-		virtual void set_volume(Model volume);
+		virtual int set_volume(Model volume);
 		virtual int render_volume(uchar4 *buffer, Raycaster r);
 };
 
@@ -70,7 +71,7 @@ class GPURenderer4: public GPURenderer {
 		virtual ~GPURenderer4();
 		virtual const char *get_name() { return "CUDA CM + 3D Texture Memory + GLI"; }
 		virtual void set_transfer_fn(Raycaster r);
-		virtual void set_volume(Model volume);
+		virtual int set_volume(Model volume);
 		virtual int render_volume(uchar4 *buffer, Raycaster r);
 };
 

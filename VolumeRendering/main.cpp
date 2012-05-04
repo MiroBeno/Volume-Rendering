@@ -21,6 +21,7 @@ static char file_name[100] = "VisMale.pvm";
 static char log_file[100] = "volr_report.log";
 bool NO_SAFE = false;
 
+static int benchmark_mode = 0;
 static int config = 0;
 static char config_names[50][80] = {"Interactive", 
 		"Bucky", "Daisy", "VisMale", "Engine", "Foot", "Pig", "Porsche",
@@ -221,6 +222,8 @@ void benchmark_config_loop() {
 	for(renderer_id = 0; renderer_id < RENDERER_COUNT; renderer_id++) {
 		if (renderer_id == 0 && config > 6 && config < 14)
 			continue;
+		if (renderer_id == 0 && benchmark_mode == 2)
+			continue;
 		ViewBase::view.perspective = false;
 		for (int p = 0; p<2; p++) {
 			ViewBase::toggle_perspective(true);
@@ -247,15 +250,16 @@ void benchmark_config_loop() {
 int benchmark_load_file(const char* file_name) {
 	char name[256] = "";
 	sprintf(name, "%s.pvm", file_name);
-	int file_loaded = ModelBase::load_model(name);
-	if (file_loaded == 0) {
+	int file_error = ModelBase::load_model(name);
+	if (!file_error) {
 		RaycasterBase::set_volume(ModelBase::volume);
 		for (int i=0; i < RENDERER_COUNT; i++) {
-			UI::renderers[i]->set_volume(RaycasterBase::raycaster.volume);
+			if (UI::renderers[i]->set_volume(RaycasterBase::raycaster.volume) != 0)
+				return 1;
 			UI::renderers[i]->set_transfer_fn(RaycasterBase::raycaster);
 		}
 	}
-	return file_loaded;
+	return file_error;
 }
 
 void benchmark() {
@@ -271,22 +275,35 @@ void benchmark() {
 		benchmark_config_loop();
 	}
 
-	benchmark_load_file("Pig");
-	for (int i = 0; i<2; i++) {
+	if (benchmark_load_file("Pig") == 0) {
 		Logger::log("%s benchmark\n", config_names[config]);
 		RaycasterBase::toggle_esl();
 		RaycasterBase::change_ray_threshold(1.0f, true);
 		benchmark_config_loop();
-
 		Logger::log("%s benchmark\n", config_names[config]);
 		RaycasterBase::change_ray_threshold(0.95f, true);
 		benchmark_config_loop();
-
 		Logger::log("%s benchmark\n", config_names[config]);
 		RaycasterBase::toggle_esl();
 		benchmark_config_loop();
-		benchmark_load_file("Foot");
 	}
+	else
+		config += 3;
+
+	if (benchmark_load_file("Foot") == 0) {
+		Logger::log("%s benchmark\n", config_names[config]);
+		RaycasterBase::toggle_esl();
+		RaycasterBase::change_ray_threshold(1.0f, true);
+		benchmark_config_loop();
+		Logger::log("%s benchmark\n", config_names[config]);
+		RaycasterBase::change_ray_threshold(0.95f, true);
+		benchmark_config_loop();
+		Logger::log("%s benchmark\n", config_names[config]);
+		RaycasterBase::toggle_esl();
+		benchmark_config_loop();
+	}
+	else
+		return;
 
 	float viewport_scale = 1.0f;
 	ushort2 original_size = {ViewBase::view.dims.x, ViewBase::view.dims.y};
@@ -333,12 +350,13 @@ void cleanup_and_exit() {
 void print_usage() {
 	printf("VolR - Volume rendering engine using CUDA, by Miroslav Beno, STU FIIT 2012\n\n");
 	printf("Usage:\n");
-	printf("VolR.exe [-h] [-f <filename>] [-r <id>] [-s <width> <height>] [-b] [-nosafe]\n");
+	printf("VolR.exe [-h] [-f <filename>] [-r <id>] [-s <width> <height>] [-b] [-bg] [-nosafe]\n");
 	printf("  -h : Show this help\n");
 	printf("  -f : Load specified file with volume data - either .pvm or .raw format\n");
 	printf("  -r : Set specified renderer: 0 - CPU, 1-4 GPU renderers\n");
 	printf("  -s : Set specified viewport size - must be in range <128; 2048>\n");
 	printf("  -b : Run in benchmark mode - can take a few minutes\n");
+	printf("  -bg : Run in benchmark mode with CPU renderer disabled - shorter\n");
 	printf("  -nosafe : CUDA errors will not cause fatal exit - experimental\n");
 }
 
@@ -352,7 +370,6 @@ int main(int argc, char **argv) {
 
 	Logger::init(log_file, 'a');
 
-	bool benchmark_mode = false;
 	for (int i = 1; i < argc; i++) {
 		char *arg = argv[i];
 		if (strncmp(arg, "-f", 2) == 0) {
@@ -389,11 +406,14 @@ int main(int argc, char **argv) {
 			}
 			Logger::log("Setting viewport size %dx%d...\n", viewport_dims.x, viewport_dims.y);
 			ViewBase::set_viewport_dims(viewport_dims);
+		} else if (strncmp(arg, "-bg", 3) == 0) {
+			Logger::log("Setting benchmark mode without CPU renderer...\n");
+			benchmark_mode = 2;
 		} else if (strncmp(arg, "-b", 2) == 0) {
 			Logger::log("Setting benchmark mode...\n");
 			benchmark_mode = true;
 		} else if (strncmp(arg, "-nosafe", 7) == 0) {
-			Logger::log("Supressing CUDA errors...\n");
+			Logger::log("Supressing CUDA fatal errors...\n");
 			NO_SAFE = true;
 		} else {
 			Logger::log("Warning: unknown argument: %s\n", arg);
@@ -401,7 +421,7 @@ int main(int argc, char **argv) {
 	}
 
 	if (ModelBase::load_model(file_name) != 0) 
-		exit(EXIT_FAILURE);
+		Logger::log("Warning: Default volume data file not loaded. Use load file on control panel...\n");
 
 	RaycasterBase::set_view(ViewBase::view);
 	RaycasterBase::reset_transfer_fn();
@@ -418,7 +438,7 @@ int main(int argc, char **argv) {
 	renderers[2] = new GPURenderer2(RaycasterBase::raycaster);
 	renderers[3] = new GPURenderer3(RaycasterBase::raycaster);
 	renderers[4] = new GPURenderer4(RaycasterBase::raycaster);
-	
+
 	if (benchmark_mode) {
 		benchmark();
 		cleanup_and_exit();

@@ -16,6 +16,8 @@
 
 extern bool NO_SAFE;
 
+// generic error responses
+
 static inline void __cuda_safe_call(cudaError_t err, const char *file, int line) {
     if (err != cudaSuccess) {
 		Logger::log("CUDA fatal error: %s in %s at line %d\n", cudaGetErrorString(err), file, line);
@@ -31,5 +33,15 @@ static inline void __cuda_safe_check(const char *file, int line ) {
 
 #define cuda_safe_call(err) (__cuda_safe_call( err, __FILE__, __LINE__ ))
 #define cuda_safe_check() (__cuda_safe_check(__FILE__, __LINE__ ))
+
+// memory errors
+
+static inline cudaError_t cuda_safe_malloc(cudaError_t err) {
+    if (err != cudaSuccess) {
+		Logger::log("CUDA memory allocation error: %s\n", cudaGetErrorString(err));
+		Logger::log("Data is probably too large for video memory.\n");
+    }
+	return err;
+}
 
 #endif
