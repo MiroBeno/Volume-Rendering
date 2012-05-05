@@ -124,13 +124,14 @@ void cuda_init() {
 	Logger::log("Initializing CUDA...\n");
     int device_count = 0;
 	if (cudaGetDeviceCount(&device_count) != cudaSuccess) {
+		if (device_count == 0) {
+			Logger::log("Error: No device supporting CUDA found\n");
+			exit(EXIT_FAILURE);
+		}
 		Logger::log("Error: Update your display drivers - need at least CUDA driver version 3.2\n");
+		cuda_safe_check();
 	}
-	cuda_safe_check();
-	if (device_count == 0) {
-		Logger::log("Error: No device supporting CUDA found\n");
-		exit(EXIT_FAILURE);
-	}
+
 	Logger::log("Number of CUDA devices found: %d\n", device_count);
   
 	cudaDeviceProp device_prop;
@@ -243,6 +244,8 @@ void benchmark_config_loop() {
 		}
 	}
 	Profiler::print_avg(config);
+	if (config <= 7)
+		Profiler::print_max(config);
 	config++;
 	Logger::log("\n");
 }

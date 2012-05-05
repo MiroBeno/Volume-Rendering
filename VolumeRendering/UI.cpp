@@ -571,7 +571,7 @@ void UI::init(Renderer **rends, int *rend_id, void (*draw_fn)(), void (*exit_fn)
     glutInit(&dummy_i, &dummy);
 	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_MULTISAMPLE);
 	glutInitWindowSize(view_size.x + GLUI_PANEL_WIDTH, view_size.y);
-	glutInitWindowPosition(700, 1);
+	glutInitWindowPosition(100, 10);
 
 	main_window_id = glutCreateWindow(app_name);
 	glutMotionFunc(motion_callback);
