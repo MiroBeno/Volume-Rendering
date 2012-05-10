@@ -21,7 +21,6 @@ struct Raycaster {
 	float ray_threshold;
 	bool esl;
 	esl_type *esl_volume;
-	uchar2 *esl_min_max;
 	unsigned short esl_block_dims;
 	float3 esl_block_size;
 	float light_kd;
@@ -44,23 +43,6 @@ struct Raycaster {
 						map_float_int(color.y, 256), 
 						map_float_int(color.z, 256), 
 						map_float_int(color.w, 256));
-	}
-
-	inline uchar2 sample_data_esl_min_max(float3 pos) {
-		return esl_min_max[
-			(map_float_int((pos.z + 1)*0.5f, volume.dims.z) / esl_block_dims) * ESL_VOLUME_DIMS * ESL_VOLUME_DIMS +
-			(map_float_int((pos.y + 1)*0.5f, volume.dims.y) / esl_block_dims) * ESL_VOLUME_DIMS  +
-			(map_float_int((pos.x + 1)*0.5f, volume.dims.x) / esl_block_dims)
-		];
-	}
-
-	inline float4 sample_color_min_max(float3 pos) {
-		unsigned char sample = sample_data_esl_min_max(pos).y;
-		float4 color = transfer_fn[sample];  // (int)sample
-		color.x *= color.w;				// aplikovanie optickeho modelu pre kompoziciu (farba * alfa)
-		color.y *= color.w;
-		color.z *= color.w;
-		return color;
 	}
 
 	__forceinline __host__ __device__  bool sample_data_esl(esl_type esl_volume[], float3 pos) {
@@ -127,6 +109,8 @@ class RaycasterBase {
 		static void update_transfer_fn();
 		static void reset_transfer_fn();
 		static void reset_ray_step();
+	private:
+		static uchar2 *esl_min_max;
 };
 
 #endif

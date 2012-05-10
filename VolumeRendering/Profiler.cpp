@@ -52,7 +52,7 @@ void Profiler::start(int renderer, int method) {
 float Profiler::stop() {
 	if (current_renderer == -1 || current_method == -1)
 		return -1;
-	// measure time
+
 	time_ms = -1;
 	if (current_method == 0) {
 		time_ms = (clock() - last_clock) / (CLOCKS_PER_SEC / 1000.0f);
@@ -61,14 +61,14 @@ float Profiler::stop() {
 		cuda_safe_call(cudaEventSynchronize(stop_event));
 		cuda_safe_call(cudaEventElapsedTime(&time_ms, start_event, stop_event));
 	}
-	// update measurements
+
 	statistics[current_config][current_renderer].samples++;
 	statistics[current_config][current_renderer].time_sum += time_ms;
 	if (time_ms > statistics[current_config][current_renderer].time_max)
 		statistics[current_config][current_renderer].time_max = time_ms;
 	last_times[last_times_counter] = time_ms;
 	last_times_counter = ++last_times_counter % LAST_SAMPLE_COUNT;
-	// reset profiler control data
+
 	current_renderer = current_method = -1;
 	return time_ms;
 }

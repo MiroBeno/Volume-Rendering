@@ -10,13 +10,13 @@ Raycaster RaycasterBase::raycaster = {
 							0.95f,
 							true,
 							(esl_type*) malloc(ESL_VOLUME_SIZE * sizeof(esl_type)),
-							(uchar2*) malloc(ESL_VOLUME_DIMS * ESL_VOLUME_DIMS * ESL_VOLUME_DIMS * sizeof(uchar2)),
 							ESL_MIN_BLOCK_SIZE,
 							{0, 0, 0},
 							0.6f
 						};
 
 float4 RaycasterBase::base_transfer_fn[TF_SIZE];
+uchar2 *RaycasterBase::esl_min_max = (uchar2*) malloc(ESL_VOLUME_DIMS * ESL_VOLUME_DIMS * ESL_VOLUME_DIMS * sizeof(uchar2));
 float2 RaycasterBase::ray_step_limits;
 
 void RaycasterBase::change_ray_step(float step, bool reset) {
@@ -56,13 +56,13 @@ void RaycasterBase::update_transfer_fn() {
 		esl_temp_tf[x] = y;
 	}
 	for(unsigned int i = 0; i < ESL_VOLUME_DIMS * ESL_VOLUME_DIMS * ESL_VOLUME_DIMS; i++) {
-		if (esl_temp_tf[raycaster.esl_min_max[i].x / TF_RATIO] > raycaster.esl_min_max[i].y / TF_RATIO)
+		if (esl_temp_tf[esl_min_max[i].x / TF_RATIO] > esl_min_max[i].y / TF_RATIO)
 			raycaster.esl_volume[i/32] |= 1 << (i % 32);
 		else 
 			raycaster.esl_volume[i/32]  &= ~(1 << (i % 32));
 	}
 	/*for(unsigned int i = 0; i < ESL_VOLUME_DIMS * ESL_VOLUME_DIMS * ESL_VOLUME_DIMS; i++) {
-		if (esl_temp_tf[raycaster.esl_min_max[i].x / TF_RATIO] > raycaster.esl_min_max[i].y / TF_RATIO)
+		if (esl_temp_tf[esl_min_max[i].x / TF_RATIO] > esl_min_max[i].y / TF_RATIO)
 			raycaster.esl_volume[i] = 1;
 		else 
 			raycaster.esl_volume[i] = 0;
@@ -76,10 +76,6 @@ void RaycasterBase::reset_transfer_fn() {
 										i > TF_SIZE/3*2 ? ((i-TF_SIZE/3*2)*3)/(float)(TF_SIZE) : 0.0f, 
 										i > ((255.0f * 0.1f)/TF_RATIO) ? i/(float)(TF_SIZE) : 0.0f);
 	}
-	//RaycasterBase::base_transfer_fn[30] = make_float4(1,1,1,1);
-	/*for (int i =0; i < TF_SIZE; i++) {
-		RaycasterBase::base_transfer_fn[i] = make_float4(0.23f, 0.23f, 0.0f, i/(float)TF_SIZE);
-	}*/
 	update_transfer_fn();
 }
 
@@ -99,8 +95,8 @@ void RaycasterBase::set_volume(Model volume) {
 	raycaster.esl_block_dims = MAXIMUM(ESL_MIN_BLOCK_SIZE, raycaster.esl_block_dims);
 
 	for(unsigned int i = 0; i < ESL_VOLUME_DIMS * ESL_VOLUME_DIMS * ESL_VOLUME_DIMS; i++) {
-		raycaster.esl_min_max[i].x = 255;
-		raycaster.esl_min_max[i].y = 0;
+		esl_min_max[i].x = 255;
+		esl_min_max[i].y = 0;
 	}
 	for(unsigned int z = 0; z < volume.dims.z; z++)
 		for(unsigned int y = 0; y < volume.dims.y; y++)
@@ -110,10 +106,10 @@ void RaycasterBase::set_volume(Model volume) {
 					(z / raycaster.esl_block_dims) * ESL_VOLUME_DIMS * ESL_VOLUME_DIMS + 
 					(y / raycaster.esl_block_dims) * ESL_VOLUME_DIMS + 
 					(x / raycaster.esl_block_dims);
-				if (raycaster.esl_min_max[esl_index].x > sample)
-					raycaster.esl_min_max[esl_index].x = sample;
-				if (raycaster.esl_min_max[esl_index].y < sample)
-					raycaster.esl_min_max[esl_index].y = sample;
+				if (esl_min_max[esl_index].x > sample)
+					esl_min_max[esl_index].x = sample;
+				if (esl_min_max[esl_index].y < sample)
+					esl_min_max[esl_index].y = sample;
 			}
 	raycaster.esl_block_size = make_float3(
 		2.0f * raycaster.esl_block_dims / volume.dims.x, //maxbound - minbound

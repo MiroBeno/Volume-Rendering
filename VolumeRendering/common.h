@@ -13,7 +13,7 @@
 
 #define MAXIMUM(a,b) ((a)>(b)?(a):(b))
 #define MINIMUM(a,b) ((a)<(b)?(a):(b))
-#define CLAMP(x,low,high) (MINIMUM((high),MAXIMUM((low),(x))))		//vyhodit
+#define CLAMP(x,low,high) (MINIMUM((high),MAXIMUM((low),(x))))		//todo: uneffective
 
 // float3 ops
 
@@ -51,7 +51,7 @@ inline __host__ __device__ float dot_product(float4 a, float4 b) {
 	return (a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w);
 }
 
-inline __host__ __device__ float3 cross_product(float3 a, float3 b) {					// vektorovy sucin
+inline __host__ __device__ float3 cross_product(float3 a, float3 b) {					
 	return make_float3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
 }
 
@@ -98,7 +98,7 @@ inline __host__ __device__ float flmax(float a, float b)
 
 // other
 
-inline __host__ __device__ unsigned int map_float_int(float f, unsigned int n) {		// mapuje float<0,1> na int<0,n-1>
+inline __host__ __device__ unsigned int map_float_int(float f, unsigned int n) {		// maps float<0,1> to int<0,n-1>
    long i = (long) (f * n);
    if (i >= (int) n) i = n - 1;
    if (i < 0) i = 0;

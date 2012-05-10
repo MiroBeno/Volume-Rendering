@@ -18,14 +18,13 @@
 #define MAX_BENCH_SAMPLE 7500
 
 static char file_name[100] = "VisMale.pvm";	
-static char log_file[100] = "volr_report.log";
+static char log_file[100] = "VolR.log";
 bool NO_SAFE = false;
 
 static int benchmark_mode = 0;
 static int config = 0;
 static char config_names[50][80] = {"Interactive", 
 		"Bucky", "Daisy", "VisMale", "Engine", "Foot", "Pig", "Porsche",
-		"Pig: No optims", "P: ERT on", "P: ERT+ESL on",
 		"Foot: No optims", "F: ERT on", "F: ERT+ESL on", 
 		"Scale 0.9", "Scale 0.8", "Scale 0.7", "Scale 0.6", "Scale 0.5", "Scale 0.4", "Scale 0.3",
 		"Ray step *1.1", "Ray step *1.2", "Ray step *1.3", "Ray step *1.4", "Ray step *1.5", "Ray step *1.6", "Ray step *1.7" };
@@ -52,12 +51,11 @@ void delete_PBO_texture() {
 }
 
 void reset_PBO_texture() {							// ! musi byt setnute main glut window, inak padne		// bug pri nastavenom downsampling a rozmere 0 pri cuda r
-	//printf("Setting pixel buffer object...\n");
 	delete_PBO_texture();
 	glGenBuffersARB(1, &pbo_gl_id);	
 	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_gl_id);
 	glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, 
-		ViewBase::view.dims.x * ViewBase::view.dims.y * 4, NULL, GL_STREAM_DRAW_ARB);		//GL_STREAM_DRAW_ARB|GL_DYNAMIC_DRAW_ARB ??  // int CHANNEL_COUNT = 4;
+		ViewBase::view.dims.x * ViewBase::view.dims.y * 4, NULL, GL_STREAM_DRAW_ARB);		
 	cuda_safe_call(cudaGraphicsGLRegisterBuffer(&pbo_cuda_id, pbo_gl_id, cudaGraphicsMapFlagsWriteDiscard));
 	glGenTextures(1, &tex_gl_id);
 	glBindTexture(GL_TEXTURE_2D, tex_gl_id);
@@ -90,7 +88,6 @@ void finalize_PBO() {
 }
 
 void draw_volume() {
-	//printf("Drawing volume...\n");
 	if (UI::viewport_resized_flag) {
 		if (ViewBase::view.dims.x < 16 || ViewBase::view.dims.y < 16)
 			return;
@@ -126,10 +123,9 @@ void cuda_init() {
 	if (cudaGetDeviceCount(&device_count) != cudaSuccess) {
 		if (device_count == 0) {
 			Logger::log("Error: No device supporting CUDA found\n");
-			exit(EXIT_FAILURE);
 		}
-		Logger::log("Error: Update your display drivers - need at least CUDA driver version 3.2\n");
 		cuda_safe_check();
+		Logger::log("Error: Update your display drivers - need at least CUDA driver version 3.2\n");
 	}
 
 	Logger::log("Number of CUDA devices found: %d\n", device_count);
@@ -211,7 +207,7 @@ void print_profiler() {
 		}
 		Logger::log("%15s,", config_names[i]);
 		Profiler::print_avg(i);
-		if (i <= 7) {
+		if (i == 0) {
 			Logger::log("%15s,", config_names[i]);
 			Profiler::print_max(i);
 		}
@@ -244,8 +240,6 @@ void benchmark_config_loop() {
 		}
 	}
 	Profiler::print_avg(config);
-	if (config <= 7)
-		Profiler::print_max(config);
 	config++;
 	Logger::log("\n");
 }
@@ -277,21 +271,6 @@ void benchmark() {
 			}
 		benchmark_config_loop();
 	}
-
-	if (benchmark_load_file("Pig") == 0) {
-		Logger::log("%s benchmark\n", config_names[config]);
-		RaycasterBase::toggle_esl();
-		RaycasterBase::change_ray_threshold(1.0f, true);
-		benchmark_config_loop();
-		Logger::log("%s benchmark\n", config_names[config]);
-		RaycasterBase::change_ray_threshold(0.95f, true);
-		benchmark_config_loop();
-		Logger::log("%s benchmark\n", config_names[config]);
-		RaycasterBase::toggle_esl();
-		benchmark_config_loop();
-	}
-	else
-		config += 3;
 
 	if (benchmark_load_file("Foot") == 0) {
 		Logger::log("%s benchmark\n", config_names[config]);
@@ -342,7 +321,6 @@ void cleanup_and_exit() {
 		delete renderers[i];
 	free(ModelBase::volume.data);
 	free(RaycasterBase::raycaster.transfer_fn);
-	free(RaycasterBase::raycaster.esl_min_max);
 	free(RaycasterBase::raycaster.esl_volume);
 	UI::destroy();
 	Logger::log("Bye!\n\n");
@@ -449,7 +427,6 @@ int main(int argc, char **argv) {
 
 	ViewBase::set_camera_position(make_float3(120, 0, 200));
 
-	//printf("Raycaster data size: %i B\n", sizeof(Raycaster));
 	Logger::log("Entering main event loop...\n");
 	UI::print_usage();
 	UI::start();

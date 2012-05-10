@@ -70,11 +70,9 @@ static __global__ void render_ray(uchar4 dev_buffer[]) {
 	if (k_range.x > k_range.y) 
 		return;
 	float4 color_acc = {0, 0, 0, 0};
-	//color_acc = color_acc + (make_float4(0.5f, 0.5f, 1, 0.5f) * (1 - color_acc.w));
 	while (k_range.x <= k_range.y) {
 		float sample = tex3D(volume_texture, (pt.x + 1)*0.5f, (pt.y + 1)*0.5f, (pt.z + 1)*0.5f);
 		float4 color_cur = tex1D(transfer_fn_texture, sample);
-		//float4 color_cur = transfer_fn[int(sample*(TF_SIZE-1))];
 		if (color_cur.w > 0.05f && raycaster.light_kd > 0.01f)
 			shade_texture(&color_cur, pt, sample);
 		color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
@@ -134,7 +132,7 @@ int GPURenderer4::set_volume(Model volume) {
     cuda_safe_call(cudaMemcpy3D(&copyParams));
 
     volume_texture.normalized = true;                      
-    volume_texture.filterMode = cudaFilterModeLinear; //vypnut pri cm ?   
+    volume_texture.filterMode = cudaFilterModeLinear;  
     volume_texture.addressMode[0] = cudaAddressModeClamp;  
     volume_texture.addressMode[1] = cudaAddressModeClamp;
     volume_texture.addressMode[2] = cudaAddressModeClamp;

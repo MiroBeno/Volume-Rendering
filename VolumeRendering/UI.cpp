@@ -109,8 +109,6 @@ void draw_main_texture() {
 }
 
 void display_callback(void) {
-	//printf("Main window display callback...\n");
-	//float frame = Profiler::stop();
 	UI::draw_function();
 	sprintf(text_buffer, "%s %s @ %.2f ms (%dx%d)", UI::app_name, UI::renderers[*UI::renderer_id]->get_name(), 
 		Profiler::time_ms, ViewBase::view.dims.x, ViewBase::view.dims.y);
@@ -126,7 +124,6 @@ void display_callback(void) {
 }
 
 void idle_callback(void) {
-	//printf("Idle callback...\n");
 	if (mouse_state.w == GLUT_UP || mouse_state.z != GLUT_LEFT_BUTTON) {
 		if (auto_rotate.x != 0 || auto_rotate.y != 0)
 			ViewBase::camera_rotate(auto_rotate);
@@ -136,7 +133,6 @@ void idle_callback(void) {
 }
 
 void reshape_callback(int w, int h) {				
-	//printf("Resizing main window... %i %i\n", w, h);
 	int left, top;
 	if (glui_panel_visible) 
 		GLUI_Master.get_viewport_area(&left, &top, &w, &h);
@@ -213,7 +209,6 @@ void keyboard_callback(unsigned char key, int x, int y) {
 }
 
 void mouse_callback(int button, int state, int x, int y) {
-	//printf("Mouse click: button:%i state:%i x:%i y:%i\n", button, state, x, y);
 	mouse_state.x = x;
 	mouse_state.y = y;
 	mouse_state.z = button;
@@ -302,7 +297,6 @@ void draw_transfer_fn() {
 }
 
 void display_tfe_callback(void) {
-	//printf("Drawing subwindow...\n");
 	glClear(GL_COLOR_BUFFER_BIT);	
 	if (tfe_color_picker_visible)
 		draw_color_picker();
@@ -476,7 +470,7 @@ void UI::toggle_auto_rotate(int update_mode) {
 }
 
 void UI::set_gpu_name(const char *name) {
-	gpu_name_text->set_text(name);					// osetrit velkost
+	gpu_name_text->set_text(name);					//todo: check size
 }
 
 void UI::destroy() {
@@ -600,7 +594,7 @@ void UI::init(Renderer **rends, int *rend_id, void (*draw_fn)(), void (*exit_fn)
 	glLoadIdentity();
 	glOrtho(0.0, TF_SIZE - 1, 0.0, 1.0, 0.0, 1.0);
 	glClearColor(0, 0, 0, 1);
-	//if (!subwindow_visible)
+	//if (!subwindow_visible)			// todo: bad behaviour if hidden before main event loop
 	//	glutHideWindow();
 
 	init_glui();
