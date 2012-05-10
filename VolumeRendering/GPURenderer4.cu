@@ -1,4 +1,6 @@
+/****************************************/
 // CUDA implementation using constant memory + 3D texture memory + GL interop
+/****************************************/
 
 #include "cuda_utils.h"
 #include "Renderer.h"
@@ -28,7 +30,7 @@ GPURenderer4::~GPURenderer4() {
 	cuda_safe_call(cudaFreeArray(esl_array));
 }
 
-__device__  bool sample_data_esl_texture(float3 pos) {
+__device__  bool sample_data_esl_texture(float3 pos) {		// additional function for esl texture fetching
 		esl_type sample = tex2D(esl_texture, 
 							map_float_int((pos.y + 1)*0.5f, raycaster.volume.dims.y) / raycaster.esl_block_dims,
 							map_float_int((pos.z + 1)*0.5f, raycaster.volume.dims.z) / raycaster.esl_block_dims);
@@ -36,7 +38,7 @@ __device__  bool sample_data_esl_texture(float3 pos) {
 		return ((sample & (1 << index)) != 0);
 }
 
-__device__ void shade_texture(float4 *color, float3 pos, float sample) {
+__device__ void shade_texture(float4 *color, float3 pos, float sample) {		// additional function for shading
 		float3 light_dir = vector_normalize(raycaster.view.light_pos - pos);
 		float sample_l = tex3D(volume_texture, 
 			(pos.x + light_dir.x * 0.01f + 1)*0.5f,
@@ -50,7 +52,7 @@ __device__ void shade_texture(float4 *color, float3 pos, float sample) {
 
 static __global__ void render_ray(uchar4 dev_buffer[]) {
 	short2 pos = {blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y};
-	if ((pos.x >= raycaster.view.dims.x) || (pos.y >= raycaster.view.dims.y))	// ak su rozmery okna nedelitelne 16, spustaju sa prazdne thready
+	if ((pos.x >= raycaster.view.dims.x) || (pos.y >= raycaster.view.dims.y))	// terminate empty thread, when view dimensions are not divisible by 16
 		return;
 
 	float3 origin, direction;
@@ -59,7 +61,7 @@ static __global__ void render_ray(uchar4 dev_buffer[]) {
 	if (!raycaster.intersect(origin, direction, &k_range)) 
 		return;
 	float3 pt = origin + (direction * k_range.x);
-	while(k_range.x <= k_range.y) { 
+	while(k_range.x <= k_range.y) {								// empty space leaping loop
 		if (raycaster.esl && sample_data_esl_texture(pt)) 
 			raycaster.leap_empty_space(pt, direction, &k_range);
 		else 
@@ -70,13 +72,13 @@ static __global__ void render_ray(uchar4 dev_buffer[]) {
 	if (k_range.x > k_range.y) 
 		return;
 	float4 color_acc = {0, 0, 0, 0};
-	while (k_range.x <= k_range.y) {
+	while (k_range.x <= k_range.y) {							// color accumulation loop
 		float sample = tex3D(volume_texture, (pt.x + 1)*0.5f, (pt.y + 1)*0.5f, (pt.z + 1)*0.5f);
 		float4 color_cur = tex1D(transfer_fn_texture, sample);
 		if (color_cur.w > 0.05f && raycaster.light_kd > 0.01f)
-			shade_texture(&color_cur, pt, sample);
+			shade_texture(&color_cur, pt, sample);				// shading
 		color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
-		if (color_acc.w > raycaster.ray_threshold) 
+		if (color_acc.w > raycaster.ray_threshold)				// early ray termination
 			break;
 		k_range.x += raycaster.ray_step;
 		pt = origin + (direction * k_range.x);
@@ -132,7 +134,7 @@ int GPURenderer4::set_volume(Model volume) {
     cuda_safe_call(cudaMemcpy3D(&copyParams));
 
     volume_texture.normalized = true;                      
-    volume_texture.filterMode = cudaFilterModeLinear;  
+    volume_texture.filterMode = cudaFilterModeLinear;				// trilinear interpolation
     volume_texture.addressMode[0] = cudaAddressModeClamp;  
     volume_texture.addressMode[1] = cudaAddressModeClamp;
     volume_texture.addressMode[2] = cudaAddressModeClamp;

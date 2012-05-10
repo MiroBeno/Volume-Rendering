@@ -1,3 +1,7 @@
+/****************************************/
+// Raycaster manager
+/****************************************/
+
 #ifndef _RAYCASTER_H_
 #define _RAYCASTER_H_
 
@@ -13,7 +17,7 @@
 
 typedef unsigned int esl_type;
 
-struct Raycaster {
+struct Raycaster {					// general rendering parameters and common functions
 	Model volume;
 	View view;
 	float4 *transfer_fn;
@@ -25,16 +29,16 @@ struct Raycaster {
 	float3 esl_block_size;
 	float light_kd;
 
-	__forceinline __host__ __device__ bool intersect(float3 pt, float3 dir, float2 *k) {  // mozne odchylky pri vypocte => hodnoty k mimo volume; riesi sa clampovanim vysledku na stenu
-		if (dir.x == 0) dir.x = 0.00001f;					// neosetrene NaN pri 0/0
+	__forceinline __host__ __device__ bool intersect(float3 pt, float3 dir, float2 *k) {  // errors in computation results in values k outside of volume - need clamping
+		if (dir.x == 0) dir.x = 0.00001f;					// todo: NaN if 0/0
 		if (dir.y == 0) dir.y = 0.00001f;
 		if (dir.z == 0) dir.z = 0.00001f;	
-		float3 k1 = (volume.min_bound - pt) / dir;			// ak je zlozka vektora rovnobezna s osou a teda so stenou kocky (dir == 0), tak
-		float3 k2 = (-volume.min_bound - pt) / dir;				// ak lezi bod v rozmedzi kocky v danej osi je vysledok (-oo; +oo), inak (-oo;-oo) alebo (+oo;+oo) 
+		float3 k1 = (volume.min_bound - pt) / dir;			// if vector component is parallel with axis and therefore with cube side (dir == 0), then
+		float3 k2 = (-volume.min_bound - pt) / dir;				// if point is inside cube result is (-oo; +oo), otherwise (-oo;-oo) or (+oo;+oo) 
 		k->x = flmax( flmax(flmin(k1.x, k2.x), flmin(k1.y, k2.y)), flmin(k1.z, k2.z) ); 
 		k->y = flmin( flmin(flmax(k1.x, k2.x), flmax(k1.y, k2.y)), flmax(k1.z, k2.z) );
-		k->x = flmax(k->x, 0);							// ak x < 0 bod vzniku luca je vnutri kocky - zacneme nie vstupnym priesecnikom, ale bodom vzniku (k = 0)
-		return ((k->x < k->y) && (k->y > 0));				// nenulovy interval koeficientu k (existuje priesecnica) A vystupny bod lezi na luci	 
+		k->x = flmax(k->x, 0);							// if x < 0 origin of ray is inside volume - not using intersection, but point of origin (k = 0)
+		return ((k->x < k->y) && (k->y > 0));				// non-zero interval k (found intersection) AND exit point is on the ray
 	}	
 
 	__forceinline __host__ __device__ void write_color(float4 color, short2 pos, uchar4 buffer[]) {

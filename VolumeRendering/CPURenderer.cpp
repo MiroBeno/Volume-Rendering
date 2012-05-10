@@ -1,3 +1,7 @@
+/****************************************/
+// CPU implementation
+/****************************************/
+
 #include <string.h>
 #include "Renderer.h"		
 
@@ -11,7 +15,7 @@ inline static void render_ray(Raycaster raycaster, uchar4 buffer[], short2 pos) 
 	if (!raycaster.intersect(origin, direction, &k_range)) 
 		return;
 	float3 pt = origin + (direction * k_range.x);
-	while(k_range.x <= k_range.y) { 
+	while(k_range.x <= k_range.y) {						// empty space leaping loop
 		if (raycaster.esl && raycaster.sample_data_esl(raycaster.esl_volume, pt)) 
 			raycaster.leap_empty_space(pt, direction, &k_range);
 		else 
@@ -22,13 +26,13 @@ inline static void render_ray(Raycaster raycaster, uchar4 buffer[], short2 pos) 
 	if (k_range.x > k_range.y) 
 		return;
 	float4 color_acc = {0, 0, 0, 0};
-	while (k_range.x <= k_range.y) {
+	while (k_range.x <= k_range.y) {					// color accumulation loop
 		unsigned char sample = raycaster.volume.sample_data(pt);
 		float4 color_cur = raycaster.transfer_fn[sample / TF_RATIO];
 		if (color_cur.w > 0.05f && raycaster.light_kd > 0.01f)
-			raycaster.shade(&color_cur, pt, sample);
+			raycaster.shade(&color_cur, pt, sample);	// shading
 		color_acc = color_acc + (color_cur * (1 - color_acc.w)); // transparency formula: C_out = C_in + C * (1-alpha_in); alpha_out = aplha_in + alpha * (1-alpha_in)
-		if (color_acc.w > raycaster.ray_threshold) 
+		if (color_acc.w > raycaster.ray_threshold)		// early ray termination
 			break;
 		k_range.x += raycaster.ray_step;
 		pt = origin + (direction * k_range.x);

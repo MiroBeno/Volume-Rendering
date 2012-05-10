@@ -1,10 +1,14 @@
+/****************************************/
+// Model manager
+/****************************************/
+
 #ifndef _MODEL_H_
 #define _MODEL_H_
 
 #include "common.h"
 #include "ddsbase.h"
 
-struct Model {
+struct Model {					// parameters for volume data
 	unsigned char *data;
 	unsigned int size;
 	ushort3 dims;		

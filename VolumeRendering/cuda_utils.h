@@ -1,3 +1,7 @@
+/****************************************/
+// CUDA errors handling
+/****************************************/
+
 #ifndef _CUDA_UTILS_H_
 #define _CUDA_UTILS_H_
 

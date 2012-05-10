@@ -1,3 +1,7 @@
+/****************************************/
+// Model manager
+/****************************************/
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -61,7 +65,7 @@ int ModelBase::load_model(const char* file_name) {
 			printf("Additonal comments:\n%s\n",comment);
 		printf("\n");
 		size = width * height * depth;				
-		//float max_scale = MAXIMUM(scale_x, MAXIMUM(scale_y, scale_z));	// scaling - nasledne treba upravit indexovanie v modeli: (pos.x*(1/bound.x)) 
+		//float max_scale = MAXIMUM(scale_x, MAXIMUM(scale_y, scale_z));	// scaling - if used indexing in model is: (pos.x*(1/bound.x)) 
 		//volume.bound = (-1) * make_float3(scale_x / max_scale, scale_y / max_scale, scale_z / max_scale);
 	}
 	if (strcmp(dot, supported_ext[0]) == 0) {

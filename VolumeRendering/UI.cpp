@@ -1,5 +1,9 @@
+/****************************************/
+// User interface
+/****************************************/
+
 #include "UI.h"
-#include "glui.h"		// includes glut.h
+#include "GL/glui.h"		// includes glut.h
 
 #define GLUI_PANEL_WIDTH 192
 

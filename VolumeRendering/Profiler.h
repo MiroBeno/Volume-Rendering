@@ -1,3 +1,7 @@
+/****************************************/
+// Simple profiler for timing kernels
+/****************************************/
+
 #ifndef _PROFILER_H_
 #define _PROFILER_H_
 

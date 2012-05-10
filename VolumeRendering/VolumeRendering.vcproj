@@ -36,9 +36,9 @@
 			<Tool
 				Name="Cudart Build Rule"
 				NvccCompilation="0"
-				Arch1="10"
-				Arch2="11"
-				Arch3="20"
+				Arch1="12"
+				Arch2="0"
+				Arch3="0"
 				TargetMachinePlatform="0"
 				MaxRegCount="32"
 				PtxAsOptionV="true"
@@ -59,7 +59,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="$(CUDA_PATH)\include;../libs"
+				AdditionalIncludeDirectories="$(CUDA_PATH)\include;../include;"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -80,7 +80,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="glui32.lib glut32.lib glew32.lib cudart.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="$(CUDA_PATH)/lib/$(PlatformName);../libs"
+				AdditionalLibraryDirectories="$(CUDA_PATH)/lib/$(PlatformName);../lib/GL;"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				OptimizeReferences="2"
@@ -219,19 +219,31 @@
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
 			<File
-				RelativePath=".\Bucky.raw"
+				RelativePath=".\Bucky.pvm"
 				>
 			</File>
 			<File
-				RelativePath=".\Foot.raw"
+				RelativePath=".\Daisy.pvm"
 				>
 			</File>
 			<File
-				RelativePath=".\VisMale.raw"
+				RelativePath=".\Engine.pvm"
 				>
 			</File>
 			<File
-				RelativePath=".\XMasTree.raw"
+				RelativePath=".\Foot.pvm"
+				>
+			</File>
+			<File
+				RelativePath=".\Pig.pvm"
+				>
+			</File>
+			<File
+				RelativePath=".\Porsche.pvm"
+				>
+			</File>
+			<File
+				RelativePath=".\VisMale.pvm"
 				>
 			</File>
 		</Filter>

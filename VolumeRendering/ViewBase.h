@@ -1,3 +1,7 @@
+/****************************************/
+// Projection and camera manager
+/****************************************/
+
 #ifndef _VIEW_H_
 #define _VIEW_H_
 #include "common.h"
@@ -5,7 +9,7 @@
 #define INT_WIN_WIDTH 800
 #define INT_WIN_HEIGHT 680
 
-struct View {
+struct View {				// parameters for projection
 	ushort2 dims;
 	float3 origin; 
 	float3 direction;  

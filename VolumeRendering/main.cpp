@@ -1,8 +1,16 @@
+/******************************************************************************************/
+// VolR - Volume rendering engine using CUDA, by Miroslav Beno, STU FIIT 2012
+/******************************************************************************************/
+
+/****************************************/
+// Main module
+/****************************************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "glew.h"
+#include "GL/glew.h"
 #include "cuda_gl_interop.h"
 
 #include "ModelBase.h"
@@ -15,7 +23,7 @@
 #include "common.h"
 #include "cuda_utils.h"
 
-#define MAX_BENCH_SAMPLE 7500
+#define MAX_BENCH_SAMPLE 7500		// benchmark timeout
 
 static char file_name[100] = "VisMale.pvm";	
 static char log_file[100] = "VolR.log";
@@ -50,7 +58,7 @@ void delete_PBO_texture() {
 	}
 }
 
-void reset_PBO_texture() {							// ! musi byt setnute main glut window, inak padne		// bug pri nastavenom downsampling a rozmere 0 pri cuda r
+void reset_PBO_texture() {							//!: main glut window must be set		//todo: crash with downscaling and window size 0
 	delete_PBO_texture();
 	glGenBuffersARB(1, &pbo_gl_id);	
 	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_gl_id);
@@ -65,7 +73,7 @@ void reset_PBO_texture() {							// ! musi byt setnute main glut window, inak pa
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }
 
-uchar4 *prepare_PBO() {							//GLubyte *
+uchar4 *prepare_PBO() {							
 	if (renderer_id < 3) {
 		return (uchar4 *) glMapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY_ARB);
 	}
@@ -122,7 +130,7 @@ void cuda_init() {
     int device_count = 0;
 	if (cudaGetDeviceCount(&device_count) != cudaSuccess) {
 		if (device_count == 0) {
-			Logger::log("Error: No device supporting CUDA found\n");
+			Logger::log("Error: No device supporting CUDA found\n");			// todo: undefined device_count if wrong driver detected
 		}
 		cuda_safe_check();
 		Logger::log("Error: Update your display drivers - need at least CUDA driver version 3.2\n");

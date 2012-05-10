@@ -1,4 +1,8 @@
-#include "glew.h"
+/****************************************/
+// Projection and camera manager
+/****************************************/
+
+#include "GL/glew.h"
 #include "ViewBase.h"
 
 View ViewBase::view = {	{INT_WIN_WIDTH, INT_WIN_HEIGHT}, 
@@ -15,9 +19,9 @@ float4 ViewBase::cam_pos = {0, 0, 3, 1};
 float4 ViewBase::light_pos = {0, 0, 3, 1};	
 float ViewBase::cam_matrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 float ViewBase::light_matrix[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
-float ViewBase::pixel_ratio_rotation = 180.0f / (MINIMUM(INT_WIN_WIDTH, INT_WIN_HEIGHT));					// pixel na uhol rotacie kamery
-float ViewBase::pixel_ratio_translation = (distance_limits.y - distance_limits.x) / (INT_WIN_HEIGHT / 2);	// pixel na vzdialenost kamery
-float ViewBase::virtual_view_size = 3.0f;		// velkost virtualneho okna v priestore
+float ViewBase::pixel_ratio_rotation = 180.0f / (MINIMUM(INT_WIN_WIDTH, INT_WIN_HEIGHT));					// pixel to camera rotation angle
+float ViewBase::pixel_ratio_translation = (distance_limits.y - distance_limits.x) / (INT_WIN_HEIGHT / 2);	// pixel to camera distance
+float ViewBase::virtual_view_size = 3.0f;		// dimenstions of virtaul window in model space
 
 float3 ViewBase::vector_rotate(float4 v, float rot_matrix[16]) {					
 	float3 r;
@@ -42,7 +46,7 @@ void ViewBase::matrix_rotate(float matrix[], float3 angles, bool reset) {
     glPopMatrix();
 }
 
-void ViewBase::update_view() {										//dlzka najvacsej hrany je 2 a stred kvadra v [0,0,0]
+void ViewBase::update_view() {										//biggest cube edge is 2 and center == [0,0,0]
     view.origin = vector_rotate(cam_pos, cam_matrix);
 	view.direction = vector_normalize(-view.origin);	
 	float step_px = virtual_view_size / MINIMUM(view.dims.x, view.dims.y);

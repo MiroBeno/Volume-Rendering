@@ -1,3 +1,7 @@
+/****************************************/
+// Raycaster manager
+/****************************************/
+
 #include <stdlib.h>
 
 #include "RaycasterBase.h"
@@ -40,13 +44,13 @@ void RaycasterBase::toggle_esl() {
 }
 
 void RaycasterBase::update_transfer_fn() {
-	for (int i = 0; i < TF_SIZE; i++) {					// pre-multiplikacia tf
+	for (int i = 0; i < TF_SIZE; i++) {					// pre-multiplication of tf
 		raycaster.transfer_fn[i].x = base_transfer_fn[i].x * base_transfer_fn[i].w;
 		raycaster.transfer_fn[i].y = base_transfer_fn[i].y * base_transfer_fn[i].w;
 		raycaster.transfer_fn[i].z = base_transfer_fn[i].z * base_transfer_fn[i].w;
 		raycaster.transfer_fn[i].w = base_transfer_fn[i].w;
 	}
-	unsigned short esl_temp_tf[TF_SIZE];		// pomocne pole rozsahov indexov transfer_fn, ktore maju 0 opacity
+	unsigned short esl_temp_tf[TF_SIZE];		// helper array with indexes range of transfer_fn with 0 opacity
 	int x, y;
 	for(x = 0; x < TF_SIZE; x++) {				
 		for(y = x; y < TF_SIZE; y++) {
@@ -81,7 +85,7 @@ void RaycasterBase::reset_transfer_fn() {
 
 void RaycasterBase::reset_ray_step() {
 	int max_dim = MAXIMUM(raycaster.volume.dims.x, MAXIMUM(raycaster.volume.dims.y, raycaster.volume.dims.z));
-	raycaster.ray_step = 2.0f / max_dim;		// dlzka najvacsej hrany je 2 
+	raycaster.ray_step = 2.0f / max_dim;		// cube edge size is 2 
 	raycaster.ray_step -= raycaster.ray_step / max_dim;
 	ray_step_limits.x = raycaster.ray_step / 3;
 	ray_step_limits.y = raycaster.ray_step * 1.666f;

@@ -1,4 +1,8 @@
-// (c) by Stefan Roettger // prevzane z http://code.google.com/p/vvv/
+/****************************************/
+// PVM, RAW parser
+/****************************************/
+
+// (c) by Stefan Roettger // from http://code.google.com/p/vvv/
 
 #ifndef DDSBASE_H
 #define DDSBASE_H

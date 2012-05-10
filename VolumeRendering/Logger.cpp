@@ -1,3 +1,7 @@
+/****************************************/
+// Simple logger
+/****************************************/
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <time.h>

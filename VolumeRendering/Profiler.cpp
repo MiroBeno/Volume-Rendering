@@ -1,3 +1,7 @@
+/****************************************/
+// Simple profiler for timing kernels
+/****************************************/
+
 #include <time.h>
 
 #include "cuda_utils.h"
