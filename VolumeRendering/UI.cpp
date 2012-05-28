@@ -343,6 +343,7 @@ void motion_tfe_callback(int x, int y) {
 void mouse_tfe_callback(int button, int state, int x, int y) {
 	if (button == GLUT_LEFT_BUTTON && state == GLUT_UP && tfe_color_picker_visible) {
 		unsigned char pick_col[3];
+		glReadBuffer(GL_FRONT);
 		glReadPixels(x, glutGet(GLUT_WINDOW_HEIGHT) - y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, pick_col);
 		tf_editor_color = make_float3(pick_col[0] / 255.0f, pick_col[1] / 255.0f, pick_col[2] / 255.0f);
 		tfe_color_picker_visible = false;
