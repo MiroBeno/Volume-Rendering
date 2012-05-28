@@ -100,6 +100,8 @@ void draw_profiler_graph() {
 }
 
 void draw_main_texture() {
+	if (ViewBase::view.dims.x < 16 || ViewBase::view.dims.y < 16)
+		return;
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, ViewBase::view.dims.x, ViewBase::view.dims.y, GL_RGBA, GL_UNSIGNED_BYTE, 0);
 	glEnable(GL_TEXTURE_2D);
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);

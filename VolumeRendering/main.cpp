@@ -58,7 +58,7 @@ void delete_PBO_texture() {
 	}
 }
 
-void reset_PBO_texture() {							//!: main glut window must be set		//todo: crash with downscaling and window size 0
+void reset_PBO_texture() {							//!: main glut window must be set		
 	delete_PBO_texture();
 	glGenBuffersARB(1, &pbo_gl_id);	
 	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo_gl_id);
