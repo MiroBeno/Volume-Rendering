@@ -29,7 +29,7 @@ struct Raycaster {					// general rendering parameters and common functions
 	float3 esl_block_size;
 	float light_kd;
 
-	__forceinline __host__ __device__ bool intersect(float3 pt, float3 dir, float2 *k) {  // errors in computation results in values k outside of volume - need clamping
+	inline __host__ __device__ bool intersect(float3 pt, float3 dir, float2 *k) {  // errors in computation results in values k outside of volume - need clamping
 		if (dir.x == 0) dir.x = 0.00001f;					// todo: NaN if 0/0
 		if (dir.y == 0) dir.y = 0.00001f;
 		if (dir.z == 0) dir.z = 0.00001f;	
@@ -41,7 +41,7 @@ struct Raycaster {					// general rendering parameters and common functions
 		return ((k->x < k->y) && (k->y > 0));				// non-zero interval k (found intersection) AND exit point is on the ray
 	}	
 
-	__forceinline __host__ __device__ void write_color(float4 color, short2 pos, uchar4 buffer[]) {
+	inline __host__ __device__ void write_color(float4 color, short2 pos, uchar4 buffer[]) {
 		buffer[pos.y * view.dims.x + pos.x] = 
 			make_uchar4( map_float_int(color.x, 256), 
 						map_float_int(color.y, 256), 
@@ -49,7 +49,7 @@ struct Raycaster {					// general rendering parameters and common functions
 						map_float_int(color.w, 256));
 	}
 
-	__forceinline __host__ __device__  bool sample_data_esl(esl_type esl_volume[], float3 pos) {
+	inline __host__ __device__  bool sample_data_esl(esl_type esl_volume[], float3 pos) {
 		/*unsigned short index = (	(map_float_int((pos.z + 1)*0.5f, volume.dims.z) / esl_block_dims) * ESL_VOLUME_DIMS * ESL_VOLUME_DIMS +
 									(map_float_int((pos.y + 1)*0.5f, volume.dims.y) / esl_block_dims) * ESL_VOLUME_DIMS +
 									(map_float_int((pos.x + 1)*0.5f, volume.dims.x) / esl_block_dims)
@@ -64,7 +64,7 @@ struct Raycaster {					// general rendering parameters and common functions
 		return ((sample & (1 << index)) != 0);
 	}
 
-	__forceinline __host__ __device__ void leap_empty_space(float3 pt, float3 dir, float2 *k) {
+	inline __host__ __device__ void leap_empty_space(float3 pt, float3 dir, float2 *k) {
 		ushort3 index = make_ushort3(
 			map_float_int((pt.x + 1)*0.5f, volume.dims.x) / esl_block_dims,
 			map_float_int((pt.y + 1)*0.5f, volume.dims.y) / esl_block_dims,
@@ -84,7 +84,7 @@ struct Raycaster {					// general rendering parameters and common functions
 		k->x += dk;
 	}
 
-	__forceinline __host__ __device__ void shade(float4 *color, float3 pos, unsigned char sample) {
+	inline __host__ __device__ void shade(float4 *color, float3 pos, unsigned char sample) {
 		float3 light_dir = vector_normalize(view.light_pos - pos);
 		float sample_l; 
 		if (color->w > 0.05f && light_kd > 0.01f) 

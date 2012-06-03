@@ -49,6 +49,8 @@ void Logger::log(const char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
 	vprintf(fmt, args);
+	va_end(args);
+	va_start(args, fmt);
 	if(log_file != NULL)
 		vfprintf(log_file, fmt, args);
 	va_end(args);

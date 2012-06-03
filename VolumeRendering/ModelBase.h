@@ -14,7 +14,7 @@ struct Model {					// parameters for volume data
 	ushort3 dims;		
 	float3 min_bound;
 
-	__forceinline __host__ __device__ unsigned char sample_data(float3 pos) {
+	inline __host__ __device__ unsigned char sample_data(float3 pos) {
 		return data[
 			map_float_int((pos.z + 1)*0.5f, dims.z) * dims.x * dims.y +
 			map_float_int((pos.y + 1)*0.5f, dims.y) * dims.x +

@@ -6,8 +6,10 @@
 #define _VIEW_H_
 #include "common.h"
 
-#define INT_WIN_WIDTH 800
-#define INT_WIN_HEIGHT 680
+//#define INT_WIN_WIDTH 800
+//#define INT_WIN_HEIGHT 680
+#define INT_WIN_WIDTH 799
+#define INT_WIN_HEIGHT 715
 
 struct View {				// parameters for projection
 	ushort2 dims;
@@ -18,7 +20,7 @@ struct View {				// parameters for projection
 	float3 light_pos;
 	bool perspective;
 
-	__forceinline __host__ __device__ void get_ray(short2 pos, float3 *origin_vector, float3 *direction_vector) {
+	inline __host__ __device__ void get_ray(short2 pos, float3 *origin_vector, float3 *direction_vector) {
 		if (perspective) {
 			*origin_vector = origin;
 			*direction_vector = direction + (right_plane * (float) (pos.x - dims.x / 2));

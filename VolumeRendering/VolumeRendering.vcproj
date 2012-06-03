@@ -36,9 +36,9 @@
 			<Tool
 				Name="Cudart Build Rule"
 				NvccCompilation="0"
-				Arch1="12"
-				Arch2="0"
-				Arch3="0"
+				Arch1="10"
+				Arch2="12"
+				Arch3="20"
 				TargetMachinePlatform="0"
 				MaxRegCount="32"
 				PtxAsOptionV="true"
@@ -143,10 +143,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\main.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\ModelBase.cpp"
 				>
 			</File>
@@ -164,6 +160,10 @@
 			</File>
 			<File
 				RelativePath=".\ViewBase.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\VolR.cpp"
 				>
 			</File>
 		</Filter>
